@@ -394,5 +394,172 @@ export function downloadCanvas(canvas: HTMLCanvasElement, filename: string, type
     link.click();
 }
 
+// Export as BMP (uncompressed bitmap)
+export function downloadAsBMP(canvas: HTMLCanvasElement, filename: string): void {
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // BMP file structure (24-bit uncompressed)
+    const rowSize = Math.ceil(width * 3 / 4) * 4; // Row must be multiple of 4 bytes
+    const pixelDataSize = rowSize * height;
+    const fileSize = 54 + pixelDataSize; // 54 = header size
+
+    const buffer = new ArrayBuffer(fileSize);
+    const view = new DataView(buffer);
+
+    // BMP Header
+    view.setUint16(0, 0x4D42, true); // 'BM'
+    view.setUint32(2, fileSize, true);
+    view.setUint32(6, 0, true); // Reserved
+    view.setUint32(10, 54, true); // Pixel data offset
+
+    // DIB Header
+    view.setUint32(14, 40, true); // DIB header size
+    view.setInt32(18, width, true);
+    view.setInt32(22, -height, true); // Negative = top-down
+    view.setUint16(26, 1, true); // Color planes
+    view.setUint16(28, 24, true); // Bits per pixel
+    view.setUint32(30, 0, true); // No compression
+    view.setUint32(34, pixelDataSize, true);
+    view.setUint32(38, 2835, true); // Horizontal resolution (72 DPI)
+    view.setUint32(42, 2835, true); // Vertical resolution
+    view.setUint32(46, 0, true); // Colors in palette
+    view.setUint32(50, 0, true); // Important colors
+
+    // Pixel data (BGR order)
+    let offset = 54;
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            view.setUint8(offset++, data[i + 2]); // B
+            view.setUint8(offset++, data[i + 1]); // G
+            view.setUint8(offset++, data[i]);     // R
+        }
+        // Padding to 4-byte boundary
+        while (offset % 4 !== 0) {
+            view.setUint8(offset++, 0);
+        }
+    }
+
+    const blob = new Blob([buffer], { type: 'image/bmp' });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+// Export as PPM (Plain text RGB matrix - Portable Pixmap)
+export function downloadAsPPM(canvas: HTMLCanvasElement, filename: string): void {
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // PPM P3 format (ASCII)
+    let ppm = `P3\n${width} ${height}\n255\n`;
+
+    for (let y = 0; y < height; y++) {
+        const row: string[] = [];
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            row.push(`${data[i]} ${data[i + 1]} ${data[i + 2]}`);
+        }
+        ppm += row.join(' ') + '\n';
+    }
+
+    const blob = new Blob([ppm], { type: 'image/x-portable-pixmap' });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+// Export as raw binary (just RGB bytes, no header)
+export function downloadAsRaw(canvas: HTMLCanvasElement, filename: string): void {
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    // Create RGB buffer (no alpha)
+    const buffer = new Uint8Array(width * height * 3);
+    let offset = 0;
+
+    for (let i = 0; i < data.length; i += 4) {
+        buffer[offset++] = data[i];     // R
+        buffer[offset++] = data[i + 1]; // G
+        buffer[offset++] = data[i + 2]; // B
+    }
+
+    const blob = new Blob([buffer], { type: 'application/octet-stream' });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+// Export as JSON matrix
+export function downloadAsJSON(canvas: HTMLCanvasElement, filename: string): void {
+    const ctx = canvas.getContext('2d')!;
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    const width = canvas.width;
+    const height = canvas.height;
+
+    const matrix: string[][] = [];
+
+    for (let y = 0; y < height; y++) {
+        const row: string[] = [];
+        for (let x = 0; x < width; x++) {
+            const i = (y * width + x) * 4;
+            const hex = '#' +
+                data[i].toString(16).padStart(2, '0') +
+                data[i + 1].toString(16).padStart(2, '0') +
+                data[i + 2].toString(16).padStart(2, '0');
+            row.push(hex);
+        }
+        matrix.push(row);
+    }
+
+    const json = JSON.stringify({
+        width,
+        height,
+        pixels: matrix
+    }, null, 2);
+
+    const blob = new Blob([json], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = URL.createObjectURL(blob);
+    link.click();
+    URL.revokeObjectURL(link.href);
+}
+
+// Export as GIF (using canvas approach)
+export function downloadAsGIF(canvas: HTMLCanvasElement, filename: string): void {
+    // GIF export via data URL (limited browser support, basic)
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/gif');
+    link.click();
+}
+
+// Export as WebP
+export function downloadAsWebP(canvas: HTMLCanvasElement, filename: string, quality: number = 0.9): void {
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = canvas.toDataURL('image/webp', quality);
+    link.click();
+}
+
 // Re-export palette utilities
 export { extractPalette, hexToRgb, findClosestColor };
+

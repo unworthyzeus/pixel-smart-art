@@ -9,7 +9,7 @@ import FilterControls from '@/components/FilterControls';
 import SizeControls from '@/components/SizeControls';
 import { PALETTES, extractPalette } from '@/lib/palettes';
 import { FilterConfig } from '@/lib/filters';
-import { generatePixelArt, downloadCanvas, PixelArtConfig, DEFAULT_CONFIG } from '@/lib/pixelEngine';
+import { generatePixelArt, downloadCanvas, downloadAsBMP, downloadAsPPM, downloadAsRaw, downloadAsJSON, downloadAsWebP, PixelArtConfig, DEFAULT_CONFIG } from '@/lib/pixelEngine';
 
 export default function Home() {
   // Image state
@@ -43,7 +43,8 @@ export default function Home() {
   // UI state
   const [showOriginal, setShowOriginal] = useState(false);
   const [showGrid, setShowGrid] = useState(false);
-  const [activeTab, setActiveTab] = useState<'size' | 'palette' | 'prefilters' | 'postfilters'>('palette');
+  const [activeTab, setActiveTab] = useState<'size' | 'palette' | 'prefilters' | 'postfilters'>('size');
+  const [showExportMenu, setShowExportMenu] = useState(false);
 
   // Get current palette
   const getCurrentPalette = useCallback((): string[] => {
@@ -185,7 +186,7 @@ export default function Home() {
                         GRID
                       </button>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 relative">
                       <button
                         onClick={handleExportPNG}
                         disabled={!pixelatedCanvas || isProcessing}
@@ -193,13 +194,56 @@ export default function Home() {
                       >
                         EXPORT PNG
                       </button>
-                      <button
-                        onClick={handleExportJPG}
-                        disabled={!pixelatedCanvas || isProcessing}
-                        className="btn-secondary text-sm"
-                      >
-                        JPG
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={() => setShowExportMenu(!showExportMenu)}
+                          disabled={!pixelatedCanvas || isProcessing}
+                          className="btn-secondary text-sm"
+                        >
+                          MORE ▾
+                        </button>
+                        {showExportMenu && (
+                          <div className="absolute top-full right-0 mt-1 z-50 glass-card p-2 min-w-[140px] flex flex-col gap-1">
+                            <button
+                              onClick={() => { handleExportJPG(); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              JPG
+                            </button>
+                            <button
+                              onClick={() => { if (pixelatedCanvas) downloadAsWebP(pixelatedCanvas, 'pixel-art.webp'); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              WebP
+                            </button>
+                            <button
+                              onClick={() => { if (pixelatedCanvas) downloadAsBMP(pixelatedCanvas, 'pixel-art.bmp'); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              BMP (Uncompressed)
+                            </button>
+                            <div className="border-t border-[var(--border)] my-1"></div>
+                            <button
+                              onClick={() => { if (pixelatedCanvas) downloadAsPPM(pixelatedCanvas, 'pixel-art.ppm'); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              PPM (ASCII Matrix)
+                            </button>
+                            <button
+                              onClick={() => { if (pixelatedCanvas) downloadAsRaw(pixelatedCanvas, 'pixel-art.raw'); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              RAW (RGB Bytes)
+                            </button>
+                            <button
+                              onClick={() => { if (pixelatedCanvas) downloadAsJSON(pixelatedCanvas, 'pixel-art.json'); setShowExportMenu(false); }}
+                              className="btn-secondary text-xs w-full"
+                            >
+                              JSON (Color Matrix)
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -221,7 +265,7 @@ export default function Home() {
             <div className="glass-card overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
               {/* Tabs */}
               <div className="flex gap-1 border-b-2 border-[var(--border)] mb-4 -mx-6 px-2 pb-2">
-                {(['palette', 'size', 'prefilters', 'postfilters'] as const).map((tab) => (
+                {(['size', 'palette', 'prefilters', 'postfilters'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
