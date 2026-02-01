@@ -278,7 +278,7 @@ export default function Home() {
               </div>
 
               {/* Tab Content */}
-              <div>
+              <div className="pt-6">
                 {activeTab === 'palette' && (
                   <PaletteSelector
                     paletteMode={paletteMode}

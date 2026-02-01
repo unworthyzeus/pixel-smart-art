@@ -8,7 +8,6 @@ export const metadata: Metadata = {
   authors: [{ name: "unworthyzeus" }],
   icons: {
     icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
       { url: '/icon.png', type: 'image/png' },
     ],
   },

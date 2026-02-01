@@ -2,9 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 
 export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const pathname = usePathname();
+    const isAudio = pathname === '/audio';
 
     return (
         <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--background)/95] backdrop-blur-md border-b-2 border-[var(--border)]">
@@ -23,9 +26,15 @@ export default function Header() {
 
                 {/* Navigation - Desktop */}
                 <nav className="hidden md:flex items-center gap-6">
-                    <Link href="/audio" className="text-[var(--text-dim)] hover:text-[var(--foreground)]">
-                        CHIPTUNE
-                    </Link>
+                    {isAudio ? (
+                        <Link href="/" className="text-[var(--text-dim)] hover:text-[var(--foreground)]">
+                            PIXEL ART
+                        </Link>
+                    ) : (
+                        <Link href="/audio" className="text-[var(--text-dim)] hover:text-[var(--foreground)]">
+                            CHIPTUNE
+                        </Link>
+                    )}
                     <Link href="/guide" className="text-[var(--text-dim)] hover:text-[var(--foreground)]">
                         GUIDE
                     </Link>
@@ -53,13 +62,23 @@ export default function Header() {
             {isMenuOpen && (
                 <div className="md:hidden border-t-2 border-[var(--border)] bg-[var(--background)]">
                     <nav className="flex flex-col p-4 gap-4">
-                        <Link
-                            href="/audio"
-                            className="text-[var(--text-dim)] hover:text-[var(--foreground)]"
-                            onClick={() => setIsMenuOpen(false)}
-                        >
-                            CHIPTUNE
-                        </Link>
+                        {isAudio ? (
+                            <Link
+                                href="/"
+                                className="text-[var(--text-dim)] hover:text-[var(--foreground)]"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                PIXEL ART
+                            </Link>
+                        ) : (
+                            <Link
+                                href="/audio"
+                                className="text-[var(--text-dim)] hover:text-[var(--foreground)]"
+                                onClick={() => setIsMenuOpen(false)}
+                            >
+                                CHIPTUNE
+                            </Link>
+                        )}
                         <Link
                             href="/guide"
                             className="text-[var(--text-dim)] hover:text-[var(--foreground)]"

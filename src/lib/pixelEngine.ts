@@ -37,7 +37,7 @@ export interface PixelArtConfig {
 }
 
 export const DEFAULT_CONFIG: PixelArtConfig = {
-    pixelSize: 8,
+    pixelSize: 4,
     outputWidth: 512,
     outputHeight: 512,
     aspectRatio: 'original',
