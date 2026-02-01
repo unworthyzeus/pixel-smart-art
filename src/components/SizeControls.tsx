@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useEffect } from 'react';
+
 interface SizeControlsProps {
     pixelSize: number;
     outputWidth: number;
@@ -54,6 +56,41 @@ export default function SizeControls({
 }: SizeControlsProps) {
     const pixelCount = Math.ceil(outputWidth / pixelSize) * Math.ceil(outputHeight / pixelSize);
 
+    // Local state to allow typing decimals like "2." without React forcing it back to "2"
+    const [localSize, setLocalSize] = useState(pixelSize.toString());
+
+    // Sync local state with prop when prop changes externally (e.g. slider)
+    useEffect(() => {
+        const currentNum = parseFloat(localSize);
+        // Only update if they differ significantly, allowing "2." and "2" to coexist
+        if (isNaN(currentNum) || Math.abs(currentNum - pixelSize) > 0.001) {
+            setLocalSize(pixelSize.toString());
+        }
+    }, [pixelSize]);
+
+    const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setLocalSize(val);
+
+        const num = parseFloat(val);
+        if (!isNaN(num)) {
+            // Only notify parent if valid number (we don't clamp immediately to allow typing)
+            onPixelSizeChange(Math.min(64, num));
+        }
+    };
+
+    const handleBlur = () => {
+        // On blur, force strict sync/clamping
+        const num = parseFloat(localSize);
+        if (isNaN(num)) {
+            setLocalSize(pixelSize.toString());
+        } else {
+            const clamped = Math.max(1, Math.min(64, num));
+            setLocalSize(clamped.toString());
+            onPixelSizeChange(clamped);
+        }
+    };
+
     return (
         <div className="flex flex-col gap-4">
             {/* Pixel Size */}
@@ -70,13 +107,12 @@ export default function SizeControls({
                         className="flex-1"
                     />
                     <input
-                        type="number"
-                        min="1"
-                        max="64"
-                        step="0.1"
-                        value={pixelSize}
-                        onChange={(e) => onPixelSizeChange(Math.max(1, Math.min(64, parseFloat(e.target.value) || 1)))}
-                        className="w-16 text-center"
+                        type="text"
+                        inputMode="decimal"
+                        value={localSize}
+                        onChange={handleTextChange}
+                        onBlur={handleBlur}
+                        className="w-16 text-center bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)]"
                     />
                 </div>
                 <div className="flex justify-between mt-2 text-sm text-[var(--text-dim)]">
@@ -95,10 +131,10 @@ export default function SizeControls({
                         <input
                             type="number"
                             min="16"
-                            max="2048"
+                            max="4096"
                             value={outputWidth}
-                            onChange={(e) => onOutputWidthChange(Math.max(16, Math.min(2048, parseInt(e.target.value) || 256)))}
-                            className="w-full"
+                            onChange={(e) => onOutputWidthChange(Math.max(16, Math.min(4096, parseInt(e.target.value) || 256)))}
+                            className="w-full bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)] px-2 py-1"
                         />
                     </div>
                     <div className="flex-1 min-w-[100px]">
@@ -106,10 +142,10 @@ export default function SizeControls({
                         <input
                             type="number"
                             min="16"
-                            max="2048"
+                            max="4096"
                             value={outputHeight}
-                            onChange={(e) => onOutputHeightChange(Math.max(16, Math.min(2048, parseInt(e.target.value) || 256)))}
-                            className="w-full"
+                            onChange={(e) => onOutputHeightChange(Math.max(16, Math.min(4096, parseInt(e.target.value) || 256)))}
+                            className="w-full bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)] px-2 py-1"
                         />
                     </div>
                 </div>
@@ -159,15 +195,13 @@ export default function SizeControls({
                         <div className="flex gap-2">
                             <button
                                 onClick={() => onAspectModeChange('crop')}
-                                className={`text-sm flex-1 ${aspectMode === 'crop' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={{ padding: '0.4rem', boxShadow: '2px 2px 0px var(--dim)' }}
+                                className={`flex-1 text-sm ${aspectMode === 'crop' ? 'btn-primary' : 'btn-secondary'}`}
                             >
                                 CROP
                             </button>
                             <button
                                 onClick={() => onAspectModeChange('stretch')}
-                                className={`text-sm flex-1 ${aspectMode === 'stretch' ? 'btn-primary' : 'btn-secondary'}`}
-                                style={{ padding: '0.4rem', boxShadow: '2px 2px 0px var(--dim)' }}
+                                className={`flex-1 text-sm ${aspectMode === 'stretch' ? 'btn-primary' : 'btn-secondary'}`}
                             >
                                 STRETCH
                             </button>
@@ -175,25 +209,23 @@ export default function SizeControls({
                     </div>
                 )}
 
-                {/* Custom Aspect Ratio */}
+                {/* Custom Aspect Ratio Inputs */}
                 {aspectRatio === 'custom' && (
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className="mt-3 flex gap-2 items-center">
                         <input
                             type="number"
                             min="1"
-                            max="100"
                             value={customAspectWidth}
-                            onChange={(e) => onCustomAspectChange(Math.max(1, parseInt(e.target.value) || 1), customAspectHeight)}
-                            className="w-16 text-center"
+                            onChange={(e) => onCustomAspectChange(parseInt(e.target.value) || 1, customAspectHeight)}
+                            className="w-16 text-center bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)]"
                         />
                         <span className="text-[var(--text-dim)]">:</span>
                         <input
                             type="number"
                             min="1"
-                            max="100"
                             value={customAspectHeight}
-                            onChange={(e) => onCustomAspectChange(customAspectWidth, Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-16 text-center"
+                            onChange={(e) => onCustomAspectChange(customAspectWidth, parseInt(e.target.value) || 1)}
+                            className="w-16 text-center bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)]"
                         />
                     </div>
                 )}
