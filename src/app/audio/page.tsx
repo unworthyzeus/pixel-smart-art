@@ -336,11 +336,63 @@ export default function AudioPage() {
                                 ))}
                             </div>
 
-                            <div className="section-title">SETTINGS</div>
+                            {/* PRE-PROCESSING */}
+                            <div className="section-title">PRE-PROCESSING</div>
+
+                            {/* Input Gain */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    INPUT GAIN: {Math.round(config.preGain * 100)}%
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0.5"
+                                    max="2"
+                                    step="0.1"
+                                    value={config.preGain}
+                                    onChange={(e) => updateConfig('preGain', parseFloat(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* High Pass */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    HIGH PASS: {config.preHighPass}Hz
+                                </label>
+                                <input
+                                    type="range"
+                                    min="20"
+                                    max="200"
+                                    step="10"
+                                    value={config.preHighPass}
+                                    onChange={(e) => updateConfig('preHighPass', parseInt(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Compression */}
+                            <div className="mb-4">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    COMPRESSION: {Math.round(config.preCompression * 100)}%
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={config.preCompression}
+                                    onChange={(e) => updateConfig('preCompression', parseFloat(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* SYNTHESIS */}
+                            <div className="section-title">SYNTHESIS</div>
 
                             {/* Bit Depth */}
-                            <div className="mb-4">
-                                <label className="text-sm text-[var(--text-dim)] mb-2 block">
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
                                     BIT DEPTH: {config.bitDepth}
                                 </label>
                                 <input
@@ -353,42 +405,42 @@ export default function AudioPage() {
                                 />
                             </div>
 
-                            {/* Sample Rate */}
-                            <div className="mb-4">
-                                <label className="text-sm text-[var(--text-dim)] mb-2 block">
-                                    SAMPLE RATE: {config.sampleRate}Hz
+                            {/* Pitch Smoothing */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    PITCH SMOOTHING: {Math.round(config.pitchSmoothing * 100)}%
                                 </label>
                                 <input
                                     type="range"
-                                    min="4000"
-                                    max="44100"
-                                    step="1000"
-                                    value={config.sampleRate}
-                                    onChange={(e) => updateConfig('sampleRate', parseInt(e.target.value))}
+                                    min="0"
+                                    max="0.95"
+                                    step="0.05"
+                                    value={config.pitchSmoothing}
+                                    onChange={(e) => updateConfig('pitchSmoothing', parseFloat(e.target.value))}
                                     className="w-full"
                                 />
                             </div>
 
-                            {/* Low Pass Filter */}
-                            <div className="mb-4">
-                                <label className="text-sm text-[var(--text-dim)] mb-2 block">
-                                    LOW PASS: {config.lowPassFreq}Hz
+                            {/* Envelope Follow */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    ENVELOPE FOLLOW: {Math.round(config.envelopeFollow * 100)}%
                                 </label>
                                 <input
                                     type="range"
-                                    min="1000"
-                                    max="16000"
-                                    step="500"
-                                    value={config.lowPassFreq}
-                                    onChange={(e) => updateConfig('lowPassFreq', parseInt(e.target.value))}
+                                    min="0"
+                                    max="1"
+                                    step="0.1"
+                                    value={config.envelopeFollow}
+                                    onChange={(e) => updateConfig('envelopeFollow', parseFloat(e.target.value))}
                                     className="w-full"
                                 />
                             </div>
 
                             {/* Noise Blend */}
                             <div className="mb-4">
-                                <label className="text-sm text-[var(--text-dim)] mb-2 block">
-                                    NOISE: {Math.round(config.noiseBlend * 100)}%
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    NOISE BLEND: {Math.round(config.noiseBlend * 100)}%
                                 </label>
                                 <input
                                     type="range"
@@ -401,10 +453,45 @@ export default function AudioPage() {
                                 />
                             </div>
 
-                            {/* Gain */}
+                            {/* POST-PROCESSING */}
+                            <div className="section-title">POST-PROCESSING</div>
+
+                            {/* Low Pass Filter */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    LOW PASS: {config.postLowPass}Hz
+                                </label>
+                                <input
+                                    type="range"
+                                    min="2000"
+                                    max="16000"
+                                    step="500"
+                                    value={config.postLowPass}
+                                    onChange={(e) => updateConfig('postLowPass', parseInt(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Warmth */}
+                            <div className="mb-3">
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    WARMTH: {Math.round(config.warmth * 100)}%
+                                </label>
+                                <input
+                                    type="range"
+                                    min="0"
+                                    max="0.8"
+                                    step="0.05"
+                                    value={config.warmth}
+                                    onChange={(e) => updateConfig('warmth', parseFloat(e.target.value))}
+                                    className="w-full"
+                                />
+                            </div>
+
+                            {/* Output Gain */}
                             <div className="mb-4">
-                                <label className="text-sm text-[var(--text-dim)] mb-2 block">
-                                    GAIN: {Math.round(config.gain * 100)}%
+                                <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                    OUTPUT GAIN: {Math.round(config.gain * 100)}%
                                 </label>
                                 <input
                                     type="range"
@@ -431,18 +518,27 @@ export default function AudioPage() {
                                 <label className="flex items-center gap-2 cursor-pointer">
                                     <input
                                         type="checkbox"
+                                        checked={config.chorus}
+                                        onChange={(e) => updateConfig('chorus', e.target.checked)}
+                                    />
+                                    <span className="text-sm">CHORUS</span>
+                                </label>
+
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                        type="checkbox"
                                         checked={config.echo}
                                         onChange={(e) => updateConfig('echo', e.target.checked)}
                                     />
-                                    <span className="text-sm">CHIP ECHO</span>
+                                    <span className="text-sm">ECHO</span>
                                 </label>
                             </div>
 
                             {/* Echo Settings */}
                             {config.echo && (
                                 <div className="mb-4 pl-4 border-l-2 border-[var(--border)]">
-                                    <label className="text-sm text-[var(--text-dim)] mb-2 block">
-                                        ECHO DELAY: {config.echoDelay}ms
+                                    <label className="text-sm text-[var(--text-dim)] mb-1 block">
+                                        DELAY: {config.echoDelay}ms
                                     </label>
                                     <input
                                         type="range"
@@ -453,8 +549,8 @@ export default function AudioPage() {
                                         onChange={(e) => updateConfig('echoDelay', parseInt(e.target.value))}
                                         className="w-full"
                                     />
-                                    <label className="text-sm text-[var(--text-dim)] mb-2 block mt-2">
-                                        ECHO DECAY: {Math.round(config.echoDecay * 100)}%
+                                    <label className="text-sm text-[var(--text-dim)] mb-1 block mt-2">
+                                        DECAY: {Math.round(config.echoDecay * 100)}%
                                     </label>
                                     <input
                                         type="range"

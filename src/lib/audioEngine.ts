@@ -1,25 +1,38 @@
-// Chiptune Audio Engine
-// Converts audio to authentic retro chiptune style using waveform synthesis
+// Chiptune Audio Engine v2
+// Proper pre/post filtering for better sound quality
 
 export type ChipStyle = 'nes' | 'gameboy' | 'c64' | 'atari';
 export type WaveformType = 'square' | 'pulse25' | 'pulse12' | 'triangle' | 'sawtooth' | 'noise';
 
 export interface ChiptuneConfig {
     chipStyle: ChipStyle;
-    bitDepth: number;           // 4-16 bits
-    sampleRate: number;         // Playback sample rate
-    waveform: WaveformType;     // Primary waveform
-    pulseWidth: number;         // Pulse width for square waves (0.1-0.9)
-    arpeggioSpeed: number;      // Arpeggio speed in Hz (0 = disabled)
-    vibratoDepth: number;       // Vibrato depth (0-1)
-    vibratoSpeed: number;       // Vibrato speed in Hz
-    noiseBlend: number;         // Blend noise for texture (0-1)
-    lowPassFreq: number;        // Low-pass filter cutoff
-    gain: number;               // Output gain
-    quantizeNotes: boolean;     // Quantize to musical notes
-    echo: boolean;              // Add chip-style echo
-    echoDelay: number;          // Echo delay in ms
-    echoDecay: number;          // Echo decay (0-1)
+    bitDepth: number;
+    sampleRate: number;
+    waveform: WaveformType;
+    pulseWidth: number;
+
+    // Pre-processing
+    preHighPass: number;        // High-pass filter to remove rumble (Hz)
+    preCompression: number;     // Compression amount (0-1)
+    preGain: number;            // Input gain before processing
+
+    // Synthesis
+    noiseBlend: number;
+    quantizeNotes: boolean;
+    pitchSmoothing: number;     // Smooth pitch changes (0-1)
+    envelopeFollow: number;     // How closely to follow original envelope (0-1)
+
+    // Post-processing
+    postLowPass: number;        // Low-pass to smooth output
+    postHighPass: number;       // High-pass to remove DC offset
+    warmth: number;             // Analog warmth/saturation (0-1)
+    gain: number;
+
+    // Effects
+    echo: boolean;
+    echoDelay: number;
+    echoDecay: number;
+    chorus: boolean;            // Subtle chorus for thickness
 }
 
 export const DEFAULT_CHIPTUNE_CONFIG: ChiptuneConfig = {
@@ -28,47 +41,55 @@ export const DEFAULT_CHIPTUNE_CONFIG: ChiptuneConfig = {
     sampleRate: 22050,
     waveform: 'square',
     pulseWidth: 0.5,
-    arpeggioSpeed: 0,
-    vibratoDepth: 0,
-    vibratoSpeed: 5,
+
+    preHighPass: 80,
+    preCompression: 0.5,
+    preGain: 1.0,
+
     noiseBlend: 0,
-    lowPassFreq: 8000,
-    gain: 0.8,
     quantizeNotes: true,
+    pitchSmoothing: 0.8,
+    envelopeFollow: 0.7,
+
+    postLowPass: 8000,
+    postHighPass: 30,
+    warmth: 0.3,
+    gain: 0.8,
+
     echo: false,
-    echoDelay: 100,
-    echoDecay: 0.4
+    echoDelay: 120,
+    echoDecay: 0.35,
+    chorus: false
 };
 
-// Chip style presets
 export const CHIP_PRESETS: Record<ChipStyle, Partial<ChiptuneConfig>> = {
     nes: {
         bitDepth: 8,
         sampleRate: 22050,
         waveform: 'square',
-        pulseWidth: 0.5,
-        lowPassFreq: 8000
+        postLowPass: 8000,
+        warmth: 0.2
     },
     gameboy: {
         bitDepth: 4,
         sampleRate: 16384,
         waveform: 'square',
-        pulseWidth: 0.5,
-        lowPassFreq: 6000
+        postLowPass: 6000,
+        warmth: 0.4
     },
     c64: {
         bitDepth: 8,
         sampleRate: 22050,
         waveform: 'sawtooth',
-        pulseWidth: 0.5,
-        lowPassFreq: 10000
+        postLowPass: 10000,
+        warmth: 0.5
     },
     atari: {
         bitDepth: 4,
         sampleRate: 15700,
         waveform: 'square',
-        pulseWidth: 0.5,
-        lowPassFreq: 4000
+        postLowPass: 4000,
+        warmth: 0.3
     }
 };
 
@@ -78,13 +99,186 @@ export interface ProcessedAudio {
     duration: number;
 }
 
-// Note frequencies (A4 = 440Hz)
+// ============== FILTER IMPLEMENTATIONS ==============
+
+// Biquad filter coefficients
+interface BiquadCoeffs {
+    b0: number; b1: number; b2: number;
+    a1: number; a2: number;
+}
+
+// Calculate high-pass biquad coefficients
+function calcHighPassCoeffs(freq: number, sampleRate: number, Q: number = 0.707): BiquadCoeffs {
+    const w0 = 2 * Math.PI * freq / sampleRate;
+    const cosW0 = Math.cos(w0);
+    const sinW0 = Math.sin(w0);
+    const alpha = sinW0 / (2 * Q);
+
+    const a0 = 1 + alpha;
+    return {
+        b0: ((1 + cosW0) / 2) / a0,
+        b1: (-(1 + cosW0)) / a0,
+        b2: ((1 + cosW0) / 2) / a0,
+        a1: (-2 * cosW0) / a0,
+        a2: (1 - alpha) / a0
+    };
+}
+
+// Calculate low-pass biquad coefficients  
+function calcLowPassCoeffs(freq: number, sampleRate: number, Q: number = 0.707): BiquadCoeffs {
+    const w0 = 2 * Math.PI * freq / sampleRate;
+    const cosW0 = Math.cos(w0);
+    const sinW0 = Math.sin(w0);
+    const alpha = sinW0 / (2 * Q);
+
+    const a0 = 1 + alpha;
+    return {
+        b0: ((1 - cosW0) / 2) / a0,
+        b1: (1 - cosW0) / a0,
+        b2: ((1 - cosW0) / 2) / a0,
+        a1: (-2 * cosW0) / a0,
+        a2: (1 - alpha) / a0
+    };
+}
+
+// Apply biquad filter
+function applyBiquad(data: Float32Array, coeffs: BiquadCoeffs): Float32Array {
+    const output = new Float32Array(data.length);
+    let x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        const x0 = data[i];
+        const y0 = coeffs.b0 * x0 + coeffs.b1 * x1 + coeffs.b2 * x2
+            - coeffs.a1 * y1 - coeffs.a2 * y2;
+        output[i] = y0;
+        x2 = x1; x1 = x0;
+        y2 = y1; y1 = y0;
+    }
+    return output;
+}
+
+// Simple compressor
+function compress(data: Float32Array, threshold: number, ratio: number, attack: number, release: number, sampleRate: number): Float32Array {
+    const output = new Float32Array(data.length);
+    const attackCoeff = Math.exp(-1 / (attack * sampleRate));
+    const releaseCoeff = Math.exp(-1 / (release * sampleRate));
+
+    let envelope = 0;
+
+    for (let i = 0; i < data.length; i++) {
+        const inputAbs = Math.abs(data[i]);
+
+        // Envelope follower
+        if (inputAbs > envelope) {
+            envelope = attackCoeff * envelope + (1 - attackCoeff) * inputAbs;
+        } else {
+            envelope = releaseCoeff * envelope + (1 - releaseCoeff) * inputAbs;
+        }
+
+        // Gain reduction
+        let gain = 1;
+        if (envelope > threshold) {
+            const overDb = 20 * Math.log10(envelope / threshold);
+            const reducedDb = overDb * (1 - 1 / ratio);
+            gain = Math.pow(10, -reducedDb / 20);
+        }
+
+        output[i] = data[i] * gain;
+    }
+
+    return output;
+}
+
+// Soft saturation for warmth
+function saturate(data: Float32Array, amount: number): Float32Array {
+    const output = new Float32Array(data.length);
+    const k = 2 * amount / (1 - amount + 0.01);
+
+    for (let i = 0; i < data.length; i++) {
+        const x = data[i];
+        // Soft clipping curve
+        output[i] = (1 + k) * x / (1 + k * Math.abs(x));
+    }
+
+    return output;
+}
+
+// ============== PITCH DETECTION ==============
+
+// Autocorrelation-based pitch detection with improvements
+function detectPitch(
+    data: Float32Array,
+    sampleRate: number,
+    windowStart: number,
+    windowSize: number
+): { freq: number; confidence: number } {
+    const endIndex = Math.min(windowStart + windowSize, data.length);
+    const actualSize = endIndex - windowStart;
+
+    if (actualSize < 64) return { freq: 0, confidence: 0 };
+
+    // Calculate RMS
+    let rms = 0;
+    for (let i = windowStart; i < endIndex; i++) {
+        rms += data[i] * data[i];
+    }
+    rms = Math.sqrt(rms / actualSize);
+
+    if (rms < 0.01) return { freq: 0, confidence: 0 };
+
+    // Normalized autocorrelation
+    const minPeriod = Math.floor(sampleRate / 1000);
+    const maxPeriod = Math.floor(sampleRate / 50);
+
+    let bestCorrelation = 0;
+    let bestPeriod = 0;
+
+    for (let period = minPeriod; period < Math.min(maxPeriod, actualSize / 2); period++) {
+        let correlation = 0;
+        let norm1 = 0;
+        let norm2 = 0;
+
+        for (let i = 0; i < actualSize - period; i++) {
+            const v1 = data[windowStart + i];
+            const v2 = data[windowStart + i + period];
+            correlation += v1 * v2;
+            norm1 += v1 * v1;
+            norm2 += v2 * v2;
+        }
+
+        const normalizedCorr = correlation / (Math.sqrt(norm1 * norm2) + 0.0001);
+
+        if (normalizedCorr > bestCorrelation) {
+            bestCorrelation = normalizedCorr;
+            bestPeriod = period;
+        }
+    }
+
+    if (bestCorrelation < 0.5) return { freq: 0, confidence: bestCorrelation };
+
+    return {
+        freq: sampleRate / bestPeriod,
+        confidence: bestCorrelation
+    };
+}
+
+// Get RMS amplitude
+function getAmplitude(data: Float32Array, start: number, size: number): number {
+    const end = Math.min(start + size, data.length);
+    let sum = 0;
+    for (let i = start; i < end; i++) {
+        sum += data[i] * data[i];
+    }
+    return Math.sqrt(sum / (end - start));
+}
+
+// ============== WAVEFORM GENERATION ==============
+
 const NOTE_FREQUENCIES: number[] = [];
 for (let i = 0; i < 128; i++) {
     NOTE_FREQUENCIES.push(440 * Math.pow(2, (i - 69) / 12));
 }
 
-// Quantize frequency to nearest musical note
 function quantizeToNote(freq: number): number {
     if (freq <= 20) return 0;
     let minDiff = Infinity;
@@ -99,148 +293,70 @@ function quantizeToNote(freq: number): number {
     return closestFreq;
 }
 
-// Generate waveform oscillator sample
 function generateWaveformSample(
     phase: number,
     waveform: WaveformType,
     pulseWidth: number,
     noiseState: { value: number; lfsr: number }
 ): number {
-    const normalizedPhase = phase % 1;
+    const p = phase % 1;
 
     switch (waveform) {
         case 'square':
-            return normalizedPhase < 0.5 ? 1 : -1;
-
+            return p < 0.5 ? 1 : -1;
         case 'pulse25':
-            return normalizedPhase < 0.25 ? 1 : -1;
-
+            return p < 0.25 ? 1 : -1;
         case 'pulse12':
-            return normalizedPhase < 0.125 ? 1 : -1;
-
+            return p < 0.125 ? 1 : -1;
         case 'triangle':
-            if (normalizedPhase < 0.5) {
-                return 4 * normalizedPhase - 1;
-            } else {
-                return 3 - 4 * normalizedPhase;
-            }
-
+            return p < 0.5 ? 4 * p - 1 : 3 - 4 * p;
         case 'sawtooth':
-            return 2 * normalizedPhase - 1;
-
+            return 2 * p - 1;
         case 'noise':
-            // Linear feedback shift register for authentic chip noise
             if (Math.random() < 0.1) {
                 const bit = ((noiseState.lfsr >> 0) ^ (noiseState.lfsr >> 2)) & 1;
                 noiseState.lfsr = (noiseState.lfsr >> 1) | (bit << 14);
                 noiseState.value = (noiseState.lfsr & 1) ? 1 : -1;
             }
             return noiseState.value;
-
         default:
-            return normalizedPhase < pulseWidth ? 1 : -1;
+            return p < pulseWidth ? 1 : -1;
     }
 }
 
-// Bit crush effect
+// Bit crush
 function bitCrush(sample: number, bits: number): number {
     const levels = Math.pow(2, bits);
     const step = 2 / levels;
     return Math.round(sample / step) * step;
 }
 
-// Simple pitch detection using zero-crossing rate and autocorrelation
-function detectPitch(
-    data: Float32Array,
-    sampleRate: number,
-    windowStart: number,
-    windowSize: number
-): number {
-    const endIndex = Math.min(windowStart + windowSize, data.length);
-    const actualSize = endIndex - windowStart;
-
-    if (actualSize < 64) return 0;
-
-    // Calculate RMS to check if there's enough signal
-    let rms = 0;
-    for (let i = windowStart; i < endIndex; i++) {
-        rms += data[i] * data[i];
-    }
-    rms = Math.sqrt(rms / actualSize);
-
-    if (rms < 0.01) return 0; // Too quiet
-
-    // Autocorrelation for pitch detection
-    const minPeriod = Math.floor(sampleRate / 1000); // Max 1000 Hz
-    const maxPeriod = Math.floor(sampleRate / 50);   // Min 50 Hz
-
-    let bestCorrelation = 0;
-    let bestPeriod = 0;
-
-    for (let period = minPeriod; period < Math.min(maxPeriod, actualSize / 2); period++) {
-        let correlation = 0;
-        let count = 0;
-
-        for (let i = 0; i < actualSize - period; i++) {
-            correlation += data[windowStart + i] * data[windowStart + i + period];
-            count++;
-        }
-
-        correlation /= count;
-
-        if (correlation > bestCorrelation) {
-            bestCorrelation = correlation;
-            bestPeriod = period;
-        }
-    }
-
-    if (bestCorrelation < 0.3 * rms * rms) return 0; // Not periodic enough
-
-    return sampleRate / bestPeriod;
-}
-
-// Extract amplitude envelope
-function getAmplitude(
-    data: Float32Array,
-    windowStart: number,
-    windowSize: number
-): number {
-    const endIndex = Math.min(windowStart + windowSize, data.length);
-    let sum = 0;
-    let count = 0;
-
-    for (let i = windowStart; i < endIndex; i++) {
-        sum += Math.abs(data[i]);
-        count++;
-    }
-
-    return count > 0 ? sum / count : 0;
-}
-
-// Low-pass filter
-function lowPassFilter(data: Float32Array, cutoffFreq: number, sampleRate: number): Float32Array {
-    if (cutoffFreq <= 0 || cutoffFreq >= sampleRate / 2) return data;
-
+// Simple chorus effect
+function applyChorus(data: Float32Array, sampleRate: number): Float32Array {
     const output = new Float32Array(data.length);
-    const rc = 1.0 / (cutoffFreq * 2 * Math.PI);
-    const dt = 1.0 / sampleRate;
-    const alpha = dt / (rc + dt);
+    const delayMs = 20;
+    const depth = 3; // ms
+    const rate = 0.5; // Hz
+    const delaySamples = Math.floor(sampleRate * delayMs / 1000);
+    const depthSamples = Math.floor(sampleRate * depth / 1000);
 
-    output[0] = data[0];
-    for (let i = 1; i < data.length; i++) {
-        output[i] = output[i - 1] + alpha * (data[i] - output[i - 1]);
+    for (let i = 0; i < data.length; i++) {
+        const lfo = Math.sin(2 * Math.PI * rate * i / sampleRate);
+        const delay = delaySamples + Math.floor(depthSamples * lfo);
+
+        let delayed = 0;
+        if (i >= delay) {
+            delayed = data[i - delay];
+        }
+
+        output[i] = data[i] * 0.7 + delayed * 0.3;
     }
 
     return output;
 }
 
-// Add chip-style echo
-function addEcho(
-    data: Float32Array,
-    sampleRate: number,
-    delayMs: number,
-    decay: number
-): Float32Array {
+// Echo effect
+function applyEcho(data: Float32Array, sampleRate: number, delayMs: number, decay: number): Float32Array {
     const delaySamples = Math.floor(sampleRate * delayMs / 1000);
     const output = new Float32Array(data.length);
 
@@ -254,12 +370,11 @@ function addEcho(
     return output;
 }
 
-// Normalize audio
+// Normalize
 function normalizeAudio(data: Float32Array, targetPeak: number = 0.95): Float32Array {
     let maxAbs = 0;
     for (let i = 0; i < data.length; i++) {
-        const abs = Math.abs(data[i]);
-        if (abs > maxAbs) maxAbs = abs;
+        if (Math.abs(data[i]) > maxAbs) maxAbs = Math.abs(data[i]);
     }
 
     if (maxAbs === 0) return data;
@@ -273,15 +388,15 @@ function normalizeAudio(data: Float32Array, targetPeak: number = 0.95): Float32A
     return output;
 }
 
-// Main chiptune conversion
+// ============== MAIN CONVERSION ==============
+
 export async function convertToChiptune(
     audioBuffer: AudioBuffer,
     config: ChiptuneConfig
 ): Promise<ProcessedAudio> {
-    const originalRate = audioBuffer.sampleRate;
-    const outputRate = config.sampleRate;
+    const sampleRate = audioBuffer.sampleRate;
 
-    // Mix to mono if stereo
+    // Mix to mono
     let inputData: Float32Array;
     if (audioBuffer.numberOfChannels > 1) {
         const left = audioBuffer.getChannelData(0);
@@ -294,89 +409,163 @@ export async function convertToChiptune(
         inputData = new Float32Array(audioBuffer.getChannelData(0));
     }
 
-    // Analysis window settings
-    const windowSize = Math.floor(originalRate * 0.02); // 20ms windows
-    const hopSize = Math.floor(windowSize / 2);
+    // ============ PRE-PROCESSING ============
+    console.log('Pre-processing...');
+
+    // Apply input gain
+    for (let i = 0; i < inputData.length; i++) {
+        inputData[i] *= config.preGain;
+    }
+
+    // High-pass filter to remove DC offset and rumble
+    if (config.preHighPass > 0) {
+        const hpCoeffs = calcHighPassCoeffs(config.preHighPass, sampleRate);
+        inputData = applyBiquad(inputData, hpCoeffs);
+    }
+
+    // Compression to even out dynamics
+    if (config.preCompression > 0) {
+        const threshold = 0.3 - config.preCompression * 0.2;
+        const ratio = 2 + config.preCompression * 4;
+        inputData = compress(inputData, threshold, ratio, 0.01, 0.1, sampleRate);
+    }
+
+    // ============ ANALYSIS ============
+    console.log('Analyzing audio...');
+
+    const windowSize = Math.floor(sampleRate * 0.03); // 30ms windows
+    const hopSize = Math.floor(windowSize / 4);
     const numWindows = Math.floor((inputData.length - windowSize) / hopSize);
 
-    // Synthesize chiptune audio
-    const outputLength = inputData.length;
-    const output = new Float32Array(outputLength);
+    // Pre-analyze all windows
+    const pitches: number[] = [];
+    const amplitudes: number[] = [];
+    const confidences: number[] = [];
 
+    for (let w = 0; w < numWindows; w++) {
+        const start = w * hopSize;
+        const { freq, confidence } = detectPitch(inputData, sampleRate, start, windowSize);
+        const amp = getAmplitude(inputData, start, windowSize);
+
+        pitches.push(freq);
+        amplitudes.push(amp);
+        confidences.push(confidence);
+    }
+
+    // Smooth pitches
+    const smoothedPitches = [...pitches];
+    if (config.pitchSmoothing > 0) {
+        const smoothFactor = config.pitchSmoothing;
+        for (let i = 1; i < smoothedPitches.length; i++) {
+            if (pitches[i] > 0 && pitches[i - 1] > 0) {
+                smoothedPitches[i] = smoothedPitches[i - 1] * smoothFactor + pitches[i] * (1 - smoothFactor);
+            }
+        }
+    }
+
+    // Smooth amplitudes
+    const smoothedAmps = [...amplitudes];
+    for (let i = 1; i < smoothedAmps.length; i++) {
+        smoothedAmps[i] = smoothedAmps[i - 1] * 0.7 + amplitudes[i] * 0.3;
+    }
+
+    // ============ SYNTHESIS ============
+    console.log('Synthesizing chiptune...');
+
+    const output = new Float32Array(inputData.length);
     let phase = 0;
     const noiseState = { value: 0, lfsr: 0x7FFF };
 
     for (let w = 0; w < numWindows; w++) {
-        const windowStart = w * hopSize;
-        const windowEnd = Math.min(windowStart + windowSize, inputData.length);
+        let freq = smoothedPitches[w];
+        const amp = smoothedAmps[w];
+        const confidence = confidences[w];
 
-        // Detect pitch and amplitude from original audio
-        let freq = detectPitch(inputData, originalRate, windowStart, windowSize);
-        const amplitude = getAmplitude(inputData, windowStart, windowSize);
-
-        // Quantize to musical note if enabled
+        // Quantize to musical notes
         if (config.quantizeNotes && freq > 0) {
             freq = quantizeToNote(freq);
         }
 
-        // Synthesize this window
-        for (let i = windowStart; i < windowEnd && i < outputLength; i++) {
+        const windowStart = w * hopSize;
+        const windowEnd = Math.min(windowStart + hopSize, inputData.length);
+
+        for (let i = windowStart; i < windowEnd; i++) {
             let sample = 0;
 
-            if (freq > 20 && amplitude > 0.01) {
-                // Apply vibrato
-                let actualFreq = freq;
-                if (config.vibratoDepth > 0) {
-                    const vibratoMod = Math.sin(2 * Math.PI * config.vibratoSpeed * i / originalRate);
-                    actualFreq = freq * (1 + config.vibratoDepth * 0.05 * vibratoMod);
-                }
-
+            if (freq > 30 && amp > 0.005 && confidence > 0.4) {
                 // Generate waveform
-                const phaseIncrement = actualFreq / originalRate;
                 sample = generateWaveformSample(phase, config.waveform, config.pulseWidth, noiseState);
-                phase += phaseIncrement;
+                phase += freq / sampleRate;
 
-                // Apply amplitude envelope from original
-                sample *= amplitude * 3; // Boost to match original level
+                // Apply envelope following
+                const targetAmp = amp * 3;
+                sample *= targetAmp * config.envelopeFollow + (1 - config.envelopeFollow) * 0.5;
             }
 
-            // Blend in noise for texture
-            if (config.noiseBlend > 0) {
+            // Blend noise
+            if (config.noiseBlend > 0 && amp > 0.005) {
                 const noiseSample = generateWaveformSample(0, 'noise', 0.5, noiseState);
-                sample = sample * (1 - config.noiseBlend) + noiseSample * config.noiseBlend * amplitude;
+                sample = sample * (1 - config.noiseBlend) + noiseSample * config.noiseBlend * amp;
             }
 
             // Bit crush
             sample = bitCrush(sample, config.bitDepth);
 
-            // Apply gain
-            sample *= config.gain;
-
-            // Soft clipping
-            if (sample > 1) sample = 1 - 1 / (sample + 1);
-            else if (sample < -1) sample = -1 - 1 / (sample - 1);
-
             output[i] = sample;
         }
     }
 
-    // Apply low-pass filter
-    let processed = lowPassFilter(output, config.lowPassFreq, originalRate);
+    // ============ POST-PROCESSING ============
+    console.log('Post-processing...');
 
-    // Add echo if enabled
-    if (config.echo) {
-        processed = addEcho(processed, originalRate, config.echoDelay, config.echoDecay);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let processed: any = output;
+
+    // Low-pass filter to remove harsh aliasing
+    if (config.postLowPass > 0 && config.postLowPass < sampleRate / 2) {
+        const lpCoeffs = calcLowPassCoeffs(config.postLowPass, sampleRate);
+        processed = applyBiquad(processed, lpCoeffs);
+        // Apply twice for steeper rolloff
+        processed = applyBiquad(processed, lpCoeffs);
     }
 
-    // Normalize
+    // High-pass to remove DC offset
+    if (config.postHighPass > 0) {
+        const hpCoeffs = calcHighPassCoeffs(config.postHighPass, sampleRate);
+        processed = applyBiquad(processed, hpCoeffs);
+    }
+
+    // Add warmth/saturation
+    if (config.warmth > 0) {
+        processed = saturate(processed, config.warmth);
+    }
+
+    // Chorus
+    if (config.chorus) {
+        processed = applyChorus(processed, sampleRate);
+    }
+
+    // Echo
+    if (config.echo) {
+        processed = applyEcho(processed, sampleRate, config.echoDelay, config.echoDecay);
+    }
+
+    // Apply output gain
+    for (let i = 0; i < processed.length; i++) {
+        processed[i] *= config.gain;
+    }
+
+    // Final normalize
     processed = normalizeAudio(processed);
 
-    // Create output AudioBuffer
+    // Create output buffer
     const audioContext = new AudioContext();
-    const outputBuffer = audioContext.createBuffer(1, processed.length, originalRate);
-    outputBuffer.getChannelData(0).set(processed);
+    const outputBuffer = audioContext.createBuffer(1, processed.length, sampleRate);
+    const channelData = outputBuffer.getChannelData(0);
+    for (let i = 0; i < processed.length; i++) {
+        channelData[i] = processed[i];
+    }
 
-    // Create WAV blob
     const wavBlob = audioBufferToWav(outputBuffer);
 
     await audioContext.close();
@@ -388,16 +577,13 @@ export async function convertToChiptune(
     };
 }
 
-// Convert AudioBuffer to WAV Blob
+// WAV export
 function audioBufferToWav(buffer: AudioBuffer): Blob {
     const numChannels = buffer.numberOfChannels;
     const sampleRate = buffer.sampleRate;
-    const format = 1; // PCM
     const bitDepth = 16;
-
     const bytesPerSample = bitDepth / 8;
     const blockAlign = numChannels * bytesPerSample;
-
     const samples = buffer.length;
     const dataSize = samples * blockAlign;
     const bufferSize = 44 + dataSize;
@@ -410,7 +596,7 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
     writeString(view, 8, 'WAVE');
     writeString(view, 12, 'fmt ');
     view.setUint32(16, 16, true);
-    view.setUint16(20, format, true);
+    view.setUint16(20, 1, true);
     view.setUint16(22, numChannels, true);
     view.setUint32(24, sampleRate, true);
     view.setUint32(28, sampleRate * blockAlign, true);
@@ -421,11 +607,9 @@ function audioBufferToWav(buffer: AudioBuffer): Blob {
 
     let offset = 44;
     for (let i = 0; i < samples; i++) {
-        for (let channel = 0; channel < numChannels; channel++) {
-            const sample = buffer.getChannelData(channel)[i];
-            const clamped = Math.max(-1, Math.min(1, sample));
-            const intSample = clamped < 0 ? clamped * 0x8000 : clamped * 0x7FFF;
-            view.setInt16(offset, intSample, true);
+        for (let ch = 0; ch < numChannels; ch++) {
+            const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+            view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7FFF, true);
             offset += 2;
         }
     }
@@ -439,7 +623,6 @@ function writeString(view: DataView, offset: number, str: string): void {
     }
 }
 
-// Load audio file
 export async function loadAudioFile(file: File): Promise<AudioBuffer> {
     const arrayBuffer = await file.arrayBuffer();
     const audioContext = new AudioContext();
@@ -448,7 +631,6 @@ export async function loadAudioFile(file: File): Promise<AudioBuffer> {
     return audioBuffer;
 }
 
-// Format duration as MM:SS
 export function formatDuration(seconds: number): string {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
