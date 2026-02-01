@@ -49,13 +49,13 @@ export default function PaletteSelector({
             <div className="section-title">COLOR PALETTE</div>
 
             {/* Mode Selection */}
-            <div className="flex gap-2 flex-wrap">
+            <div className="grid grid-cols-2 gap-2">
                 {(['none', 'predefined', 'extracted', 'custom'] as const).map((mode) => (
                     <button
                         key={mode}
                         onClick={() => onPaletteModeChange(mode)}
                         className={`text-sm ${paletteMode === mode ? 'btn-primary' : 'btn-secondary'}`}
-                        style={{ padding: '0.4rem 0.8rem', boxShadow: '2px 2px 0px var(--dim)' }}
+                        style={{ padding: '0.3rem 0.5rem', boxShadow: '2px 2px 0px var(--dim)' }}
                     >
                         {mode === 'none' ? 'ORIGINAL' : mode.toUpperCase()}
                     </button>

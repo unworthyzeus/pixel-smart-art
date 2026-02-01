@@ -148,20 +148,15 @@ export default function Home() {
       <Header />
 
       {/* Main Content */}
-      <main className="flex-1 pt-24 pb-12 px-4" style={{ width: '100%' }}>
-        <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
-          {/* Hero Section */}
-          <section className="text-center mb-8">
-            <h2 className="text-3xl md:text-4xl mb-4" style={{ borderBottom: 'none' }}>
-              PIXEL ART GENERATOR
-            </h2>
-            <p className="text-[var(--text-dim)] text-lg" style={{ maxWidth: '640px', margin: '0 auto' }}>
-              Convert images to pixel art with custom palettes and filters
-            </p>
-          </section>
+      <main className="flex-1 px-4 py-6" style={{ width: '100%', paddingTop: '80px' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+          {/* Subtitle */}
+          <p className="text-center text-[var(--text-dim)] mb-6">
+            Convert images to pixel art with custom palettes and filters
+          </p>
 
           {/* App Layout */}
-          <div className="grid lg:grid-cols-[1fr_380px] gap-6">
+          <div className="grid lg:grid-cols-[1fr_400px] gap-6">
             {/* Preview Panel */}
             <div className="glass-card">
               {!originalImage ? (
@@ -223,14 +218,15 @@ export default function Home() {
             </div>
 
             {/* Controls Panel */}
-            <div className="glass-card overflow-y-auto max-h-[calc(100vh-200px)]">
+            <div className="glass-card overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
               {/* Tabs */}
-              <div className="flex border-b-2 border-[var(--border)] mb-4 -mx-6 px-4">
+              <div className="flex gap-1 border-b-2 border-[var(--border)] mb-4 -mx-6 px-2 pb-2">
                 {(['palette', 'size', 'prefilters', 'postfilters'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`tab-button ${activeTab === tab ? 'active' : ''}`}
+                    style={{ fontSize: '0.9rem', padding: '0.3rem 0.6rem' }}
                   >
                     {tab === 'prefilters' ? 'PRE' : tab === 'postfilters' ? 'POST' : tab.toUpperCase()}
                   </button>
