@@ -6,6 +6,12 @@ export const metadata: Metadata = {
   description: "Transform images into pixel art with custom palettes, filters, and precise controls. Client-side processing, no uploads required.",
   keywords: ["pixel art", "image converter", "retro art", "palette", "pixelation"],
   authors: [{ name: "unworthyzeus" }],
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'PixelSmart',
+  },
   icons: {
     icon: [
       { url: '/icon.png', type: 'image/png' },
