@@ -3,14 +3,16 @@
 import { PALETTES } from '@/lib/palettes';
 
 interface PaletteSelectorProps {
-    paletteMode: 'predefined' | 'extracted' | 'custom';
+    paletteMode: 'predefined' | 'extracted' | 'custom' | 'none';
     selectedPaletteId: string;
     customPalette: string[];
     extractedColorCount: number;
-    onPaletteModeChange: (mode: 'predefined' | 'extracted' | 'custom') => void;
+    samplingMode: 'nearest' | 'average' | 'bilinear' | 'center';
+    onPaletteModeChange: (mode: 'predefined' | 'extracted' | 'custom' | 'none') => void;
     onPaletteSelect: (id: string) => void;
     onCustomPaletteChange: (colors: string[]) => void;
     onExtractedCountChange: (count: number) => void;
+    onSamplingModeChange: (mode: 'nearest' | 'average' | 'bilinear' | 'center') => void;
 }
 
 export default function PaletteSelector({
@@ -18,10 +20,12 @@ export default function PaletteSelector({
     selectedPaletteId,
     customPalette,
     extractedColorCount,
+    samplingMode,
     onPaletteModeChange,
     onPaletteSelect,
     onCustomPaletteChange,
-    onExtractedCountChange
+    onExtractedCountChange,
+    onSamplingModeChange
 }: PaletteSelectorProps) {
     const selectedPalette = PALETTES.find(p => p.id === selectedPaletteId) || PALETTES[0];
 
@@ -46,14 +50,14 @@ export default function PaletteSelector({
 
             {/* Mode Selection */}
             <div className="flex gap-2 flex-wrap">
-                {(['predefined', 'extracted', 'custom'] as const).map((mode) => (
+                {(['none', 'predefined', 'extracted', 'custom'] as const).map((mode) => (
                     <button
                         key={mode}
                         onClick={() => onPaletteModeChange(mode)}
                         className={`text-sm ${paletteMode === mode ? 'btn-primary' : 'btn-secondary'}`}
                         style={{ padding: '0.4rem 0.8rem', boxShadow: '2px 2px 0px var(--dim)' }}
                     >
-                        {mode.toUpperCase()}
+                        {mode === 'none' ? 'ORIGINAL' : mode.toUpperCase()}
                     </button>
                 ))}
             </div>
@@ -158,6 +162,38 @@ export default function PaletteSelector({
                     </p>
                 </div>
             )}
+
+            {/* None/Original Mode */}
+            {paletteMode === 'none' && (
+                <div className="flex flex-col gap-3">
+                    <p className="text-sm text-[var(--text-dim)]">
+                        Use original image colors without palette mapping
+                    </p>
+                </div>
+            )}
+
+            {/* Sampling Mode */}
+            <div className="mt-4 pt-4 border-t border-[var(--border)]">
+                <div className="section-title">SAMPLING MODE</div>
+                <div className="grid grid-cols-2 gap-2">
+                    {(['nearest', 'average', 'bilinear', 'center'] as const).map((mode) => (
+                        <button
+                            key={mode}
+                            onClick={() => onSamplingModeChange(mode)}
+                            className={`text-sm ${samplingMode === mode ? 'btn-primary' : 'btn-secondary'}`}
+                            style={{ padding: '0.4rem', boxShadow: '2px 2px 0px var(--dim)' }}
+                        >
+                            {mode.toUpperCase()}
+                        </button>
+                    ))}
+                </div>
+                <p className="text-sm text-[var(--text-dim)] mt-2">
+                    {samplingMode === 'nearest' && 'Fast, sharp edges'}
+                    {samplingMode === 'average' && 'Smooth, averages pixel blocks'}
+                    {samplingMode === 'bilinear' && 'Smooth interpolation'}
+                    {samplingMode === 'center' && 'Sample from block center'}
+                </p>
+            </div>
         </div>
     );
 }

@@ -27,11 +27,14 @@ export default function Home() {
   const [customAspectHeight, setCustomAspectHeight] = useState(1);
 
   // Palette state
-  const [paletteMode, setPaletteMode] = useState<'predefined' | 'extracted' | 'custom'>(DEFAULT_CONFIG.paletteMode);
+  const [paletteMode, setPaletteMode] = useState<'predefined' | 'extracted' | 'custom' | 'none'>(DEFAULT_CONFIG.paletteMode);
   const [selectedPaletteId, setSelectedPaletteId] = useState('pico8');
   const [customPalette, setCustomPalette] = useState<string[]>(['#000000', '#ffffff', '#ff0000', '#00ff00', '#0000ff', '#ffff00']);
   const [extractedColorCount, setExtractedColorCount] = useState(DEFAULT_CONFIG.extractedColorCount || 16);
   const [extractedPalette, setExtractedPalette] = useState<string[]>([]);
+
+  // Sampling mode
+  const [samplingMode, setSamplingMode] = useState<'nearest' | 'average' | 'bilinear' | 'center'>(DEFAULT_CONFIG.samplingMode);
 
   // Filter state
   const [preFilters, setPreFilters] = useState<FilterConfig[]>([]);
@@ -51,6 +54,8 @@ export default function Home() {
         return extractedPalette.length > 0 ? extractedPalette : ['#000000', '#ffffff'];
       case 'custom':
         return customPalette.length > 0 ? customPalette : ['#000000', '#ffffff'];
+      case 'none':
+        return []; // Empty palette = use original colors
       default:
         return PALETTES[0].colors;
     }
@@ -90,6 +95,7 @@ export default function Home() {
         paletteId: selectedPaletteId,
         customPalette,
         extractedColorCount,
+        samplingMode,
         preFilters,
         postFilters,
         preserveAspect: true,
@@ -110,14 +116,14 @@ export default function Home() {
   }, [
     originalImage, pixelSize, outputWidth, outputHeight, aspectRatio, aspectMode,
     customAspectWidth, customAspectHeight, paletteMode, selectedPaletteId,
-    customPalette, extractedColorCount, preFilters, postFilters, showGrid, getCurrentPalette
+    customPalette, extractedColorCount, samplingMode, preFilters, postFilters, showGrid, getCurrentPalette
   ]);
 
   // Auto-process on changes
   useEffect(() => {
     const timer = setTimeout(() => {
       processImage();
-    }, 300);
+    }, 500); // Increased debounce for less lag
     return () => clearTimeout(timer);
   }, [processImage]);
 
@@ -142,14 +148,14 @@ export default function Home() {
       <Header />
 
       {/* Main Content */}
-      <main className="flex-1 pt-24 pb-12 px-4">
-        <div className="max-w-7xl mx-auto">
+      <main className="flex-1 pt-24 pb-12 px-4" style={{ width: '100%' }}>
+        <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%' }}>
           {/* Hero Section */}
           <section className="text-center mb-8">
             <h2 className="text-3xl md:text-4xl mb-4" style={{ borderBottom: 'none' }}>
               PIXEL ART GENERATOR
             </h2>
-            <p className="text-[var(--text-dim)] text-lg max-w-2xl mx-auto">
+            <p className="text-[var(--text-dim)] text-lg" style={{ maxWidth: '640px', margin: '0 auto' }}>
               Convert images to pixel art with custom palettes and filters
             </p>
           </section>
@@ -239,10 +245,12 @@ export default function Home() {
                     selectedPaletteId={selectedPaletteId}
                     customPalette={customPalette}
                     extractedColorCount={extractedColorCount}
+                    samplingMode={samplingMode}
                     onPaletteModeChange={setPaletteMode}
                     onPaletteSelect={setSelectedPaletteId}
                     onCustomPaletteChange={setCustomPalette}
                     onExtractedCountChange={setExtractedColorCount}
+                    onSamplingModeChange={setSamplingMode}
                   />
                 )}
 

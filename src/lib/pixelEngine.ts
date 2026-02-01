@@ -16,10 +16,13 @@ export interface PixelArtConfig {
     customAspectHeight?: number;
 
     // Color palette
-    paletteMode: 'predefined' | 'extracted' | 'custom';
+    paletteMode: 'predefined' | 'extracted' | 'custom' | 'none';
     paletteId?: string;
     customPalette?: string[];
     extractedColorCount?: number;
+
+    // Sampling/interpolation mode
+    samplingMode: 'nearest' | 'average' | 'bilinear' | 'center';
 
     // Filters
     preFilters: FilterConfig[];
@@ -41,6 +44,7 @@ export const DEFAULT_CONFIG: PixelArtConfig = {
     aspectMode: 'crop',
     paletteMode: 'extracted',
     extractedColorCount: 16,
+    samplingMode: 'nearest',
     preFilters: [],
     postFilters: [],
     preserveAspect: true,
@@ -110,7 +114,7 @@ export function pixelateImage(
     config: PixelArtConfig,
     palette: string[]
 ): HTMLCanvasElement {
-    const { pixelSize, outputWidth, outputHeight } = config;
+    const { pixelSize, outputWidth, outputHeight, samplingMode, paletteMode } = config;
 
     // Create working canvas for pixelation
     const pixelWidth = Math.ceil(outputWidth / pixelSize);
@@ -122,34 +126,102 @@ export function pixelateImage(
     downCanvas.height = pixelHeight;
     const downCtx = downCanvas.getContext('2d')!;
 
-    // Disable smoothing for crisp pixels
-    downCtx.imageSmoothingEnabled = config.smoothing;
-
-    // Draw scaled down image
-    downCtx.drawImage(sourceCanvas, 0, 0, pixelWidth, pixelHeight);
-
-    // Get pixel data
-    const imageData = downCtx.getImageData(0, 0, pixelWidth, pixelHeight);
-
-    // Apply palette mapping
-    for (let i = 0; i < imageData.data.length; i += 4) {
-        const color = {
-            r: imageData.data[i],
-            g: imageData.data[i + 1],
-            b: imageData.data[i + 2]
-        };
-
-        if (imageData.data[i + 3] > 0) { // Skip fully transparent
-            const closestHex = findClosestColor(color, palette);
-            const closest = hexToRgb(closestHex);
-            imageData.data[i] = closest.r;
-            imageData.data[i + 1] = closest.g;
-            imageData.data[i + 2] = closest.b;
-        }
+    // Set smoothing based on sampling mode
+    if (samplingMode === 'bilinear') {
+        downCtx.imageSmoothingEnabled = true;
+        downCtx.imageSmoothingQuality = 'high';
+    } else {
+        downCtx.imageSmoothingEnabled = false;
     }
 
-    // Put the modified data back
-    downCtx.putImageData(imageData, 0, 0);
+    // Apply sampling mode
+    if (samplingMode === 'average') {
+        // Manual averaging: sample each pixel block
+        const srcCtx = sourceCanvas.getContext('2d')!;
+        const srcData = srcCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+        const dstData = downCtx.createImageData(pixelWidth, pixelHeight);
+
+        const blockW = sourceCanvas.width / pixelWidth;
+        const blockH = sourceCanvas.height / pixelHeight;
+
+        for (let py = 0; py < pixelHeight; py++) {
+            for (let px = 0; px < pixelWidth; px++) {
+                let r = 0, g = 0, b = 0, a = 0, count = 0;
+
+                const startX = Math.floor(px * blockW);
+                const startY = Math.floor(py * blockH);
+                const endX = Math.floor((px + 1) * blockW);
+                const endY = Math.floor((py + 1) * blockH);
+
+                for (let sy = startY; sy < endY; sy++) {
+                    for (let sx = startX; sx < endX; sx++) {
+                        const idx = (sy * sourceCanvas.width + sx) * 4;
+                        r += srcData.data[idx];
+                        g += srcData.data[idx + 1];
+                        b += srcData.data[idx + 2];
+                        a += srcData.data[idx + 3];
+                        count++;
+                    }
+                }
+
+                const dstIdx = (py * pixelWidth + px) * 4;
+                dstData.data[dstIdx] = Math.round(r / count);
+                dstData.data[dstIdx + 1] = Math.round(g / count);
+                dstData.data[dstIdx + 2] = Math.round(b / count);
+                dstData.data[dstIdx + 3] = Math.round(a / count);
+            }
+        }
+        downCtx.putImageData(dstData, 0, 0);
+    } else if (samplingMode === 'center') {
+        // Sample from center of each block
+        const srcCtx = sourceCanvas.getContext('2d')!;
+        const srcData = srcCtx.getImageData(0, 0, sourceCanvas.width, sourceCanvas.height);
+        const dstData = downCtx.createImageData(pixelWidth, pixelHeight);
+
+        const blockW = sourceCanvas.width / pixelWidth;
+        const blockH = sourceCanvas.height / pixelHeight;
+
+        for (let py = 0; py < pixelHeight; py++) {
+            for (let px = 0; px < pixelWidth; px++) {
+                const cx = Math.floor((px + 0.5) * blockW);
+                const cy = Math.floor((py + 0.5) * blockH);
+                const idx = (cy * sourceCanvas.width + cx) * 4;
+
+                const dstIdx = (py * pixelWidth + px) * 4;
+                dstData.data[dstIdx] = srcData.data[idx];
+                dstData.data[dstIdx + 1] = srcData.data[idx + 1];
+                dstData.data[dstIdx + 2] = srcData.data[idx + 2];
+                dstData.data[dstIdx + 3] = srcData.data[idx + 3];
+            }
+        }
+        downCtx.putImageData(dstData, 0, 0);
+    } else {
+        // Default: nearest neighbor or bilinear (handled by imageSmoothingEnabled)
+        downCtx.drawImage(sourceCanvas, 0, 0, pixelWidth, pixelHeight);
+    }
+
+    // Get pixel data for palette mapping (only if using a palette)
+    if (paletteMode !== 'none' && palette.length > 0) {
+        const imageData = downCtx.getImageData(0, 0, pixelWidth, pixelHeight);
+
+        for (let i = 0; i < imageData.data.length; i += 4) {
+            const color = {
+                r: imageData.data[i],
+                g: imageData.data[i + 1],
+                b: imageData.data[i + 2]
+            };
+
+            if (imageData.data[i + 3] > 0) { // Skip fully transparent
+                const closestHex = findClosestColor(color, palette);
+                const closest = hexToRgb(closestHex);
+                imageData.data[i] = closest.r;
+                imageData.data[i + 1] = closest.g;
+                imageData.data[i + 2] = closest.b;
+            }
+        }
+
+        downCtx.putImageData(imageData, 0, 0);
+    }
 
     // Create output canvas at full size
     const outputCanvas = document.createElement('canvas');

@@ -50,7 +50,7 @@ export default function PixelPreview({
 
         // Draw grid overlay
         if (showGrid && !showOriginal && pixelatedCanvas) {
-            ctx.strokeStyle = 'rgba(51, 255, 0, 0.3)';
+            ctx.strokeStyle = 'rgba(0, 243, 255, 0.3)';
             ctx.lineWidth = 1;
 
             for (let x = pixelSize; x < canvas.width; x += pixelSize) {
