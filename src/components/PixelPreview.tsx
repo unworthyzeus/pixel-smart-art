@@ -97,12 +97,12 @@ export default function PixelPreview({
     const hasContent = originalImage || pixelatedCanvas;
 
     return (
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-4 h-full lg:h-auto">
             {/* Preview Container */}
             <div
                 ref={containerRef}
-                className={`pixel-preview ${hasContent ? 'has-image' : ''} relative`}
-                style={{ minHeight: '600px', overflow: 'hidden' }}
+                className={`pixel-preview ${hasContent ? 'has-image' : ''} relative h-full lg:h-[600px]`}
+                style={{ overflow: 'hidden' }}
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}

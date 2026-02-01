@@ -149,17 +149,17 @@ export default function Home() {
       <Header />
 
       {/* Main Content */}
-      <main className="flex-1 px-4 py-6" style={{ width: '100%', paddingTop: '80px' }}>
+      <main className={`flex-1 px-0 lg:px-4 py-0 lg:py-6 flex flex-col ${originalImage ? 'h-[calc(100vh-80px)] lg:h-auto' : ''}`} style={{ width: '100%', paddingTop: '80px' }}>
         <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%' }}>
           {/* Subtitle */}
-          <p className="text-center text-[var(--text-dim)] mb-6">
+          <p className={`text-center text-[var(--text-dim)] mb-6 ${originalImage ? 'hidden lg:block' : ''}`}>
             Convert images to pixel art with custom palettes and filters
           </p>
 
           {/* App Layout */}
-          <div className="grid lg:grid-cols-[1fr_400px] gap-6">
+          <div className={`${originalImage ? 'flex flex-col h-full lg:grid lg:grid-cols-[1fr_400px]' : ''} gap-6`}>
             {/* Preview Panel */}
-            <div className="glass-card">
+            <div className={`${originalImage ? 'flex-1 overflow-hidden relative bg-[var(--background-dark)] lg:bg-transparent lg:overflow-visible lg:glass-card flex flex-col justify-center' : 'glass-card'}`}>
               {!originalImage ? (
                 <ImageDropZone onImageLoad={handleImageLoad} />
               ) : (
@@ -262,7 +262,7 @@ export default function Home() {
             </div>
 
             {/* Controls Panel */}
-            <div className="glass-card overflow-y-auto" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+            <div className={`${originalImage ? 'h-[45vh] lg:h-auto lg:max-h-[calc(100vh-120px)] overflow-y-auto bg-[var(--background)] lg:bg-transparent border-t-2 border-[var(--primary-glow)] lg:border-none rounded-t-2xl lg:rounded-none shadow-[0_-5px_20px_rgba(0,0,0,0.5)] lg:shadow-none lg:glass-card z-20' : 'glass-card'}`}>
               {/* Tabs */}
               <div className="flex gap-1 border-b-2 border-[var(--border)] mb-4 -mx-6 px-2 pb-2">
                 {(['size', 'palette', 'prefilters', 'postfilters'] as const).map((tab) => (
