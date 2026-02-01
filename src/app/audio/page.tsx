@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import Link from 'next/link';
+import Header from '@/components/Header';
 import {
     ChiptuneConfig,
     DEFAULT_CHIPTUNE_CONFIG,
@@ -186,26 +187,8 @@ export default function AudioPage() {
     }, []);
 
     return (
-        <div className="min-h-screen flex flex-col">
-            {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[var(--border)] bg-[var(--background)]">
-                <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: '1rem' }} className="flex items-center justify-between">
-                    <Link href="/" className="flex items-center gap-3 no-underline">
-                        <div className="w-10 h-10 border-2 border-[var(--foreground)] flex items-center justify-center bg-[var(--background)]">
-                            <span className="text-xl font-bold">P</span>
-                        </div>
-                        <h1 className="text-lg m-0 p-0" style={{ borderBottom: 'none' }}>
-                            PIXELSMART
-                        </h1>
-                    </Link>
-                    <nav className="flex items-center gap-6">
-                        <Link href="/" className="text-[var(--text-dim)] hover:text-[var(--foreground)]">
-                            PIXEL ART
-                        </Link>
-                        <span className="text-[var(--foreground)]">CHIPTUNE</span>
-                    </nav>
-                </div>
-            </header>
+        <div className="min-h-screen">
+            <Header />
 
             {/* Main Content */}
             <main className="flex-1 px-4 py-6" style={{ width: '100%', paddingTop: '80px' }}>

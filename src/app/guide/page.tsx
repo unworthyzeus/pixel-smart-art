@@ -1,21 +1,11 @@
 import Link from 'next/link';
+import Header from '@/components/Header';
 
 export default function GuidePage() {
     return (
         <div className="min-h-screen">
             {/* Header */}
-            <header className="fixed top-0 left-0 right-0 z-50 border-b-2 border-[var(--border)] bg-[var(--background)]">
-                <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: '1rem' }} className="flex items-center justify-between">
-                    <Link href="/" className="no-underline">
-                        <h1 className="text-lg m-0 p-0" style={{ borderBottom: 'none' }}>
-                            PIXELSMART
-                        </h1>
-                    </Link>
-                    <Link href="/" className="btn-secondary text-sm">
-                        BACK
-                    </Link>
-                </div>
-            </header>
+            <Header />
 
             {/* Content */}
             <main className="px-4 py-8" style={{ width: '100%', paddingTop: '100px' }}>

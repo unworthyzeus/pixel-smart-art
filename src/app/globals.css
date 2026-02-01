@@ -24,10 +24,37 @@
   --scanline-opacity: 0.06;
 }
 
+/* Hide spin buttons in number inputs */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+}
+
+/* Mobile Safe Areas & Native Feel */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  /* Disable pull-to-refresh on mobile */
+  overscroll-behavior-y: none;
+}
+
+/* HIde Scrollbars for native feel */
+::-webkit-scrollbar {
+  display: none;
 }
 
 html {

@@ -237,11 +237,49 @@ export function pixelateImage(
     outputCtx.imageSmoothingEnabled = false;
 
     // Scale up the pixelated image
-    outputCtx.drawImage(
-        downCanvas,
-        0, 0, pixelWidth, pixelHeight,
-        0, 0, outputCanvas.width, outputCanvas.height
-    );
+    // Scale up the pixelated image
+    // If pixel size is effectively an integer, standard nearest neighbor is fine
+    // We check deviation from nearest integer to handle float epsilon (e.g. 2.0000001)
+    if (Math.abs(Math.round(pixelSize) - pixelSize) < 0.01) {
+        outputCtx.drawImage(
+            downCanvas,
+            0, 0, pixelWidth, pixelHeight,
+            0, 0, outputCanvas.width, outputCanvas.height
+        );
+    } else {
+        // For fractional sizes, we supersample to avoid jitter (varying pixel widths like 2,3,2,3)
+        // We find a multiplier M such that pixelSize * M is roughly an integer (or just use a high fixed factor)
+        // M=4 means we render at 4x resolution then downsample with smoothing
+        const M = 4;
+
+        // 1. Create a super-resolution canvas where each 'pixel' is an integer size
+        const superValuesScale = Math.round(pixelSize * M); // e.g. 2.5 * 4 = 10
+        const superWidth = pixelWidth * superValuesScale;
+        const superHeight = pixelHeight * superValuesScale;
+
+        const superCanvas = document.createElement('canvas');
+        superCanvas.width = superWidth;
+        superCanvas.height = superHeight;
+        const superCtx = superCanvas.getContext('2d')!;
+
+        // 2. Draw nearest-neighbor onto super canvas (Integer scaling!)
+        superCtx.imageSmoothingEnabled = false;
+        superCtx.drawImage(
+            downCanvas,
+            0, 0, pixelWidth, pixelHeight,
+            0, 0, superWidth, superHeight
+        );
+
+        // 3. Draw super canvas onto output with smoothing (Downsampling)
+        // This averages the boundaries, creating consistent 'visual' centers
+        outputCtx.imageSmoothingEnabled = true;
+        outputCtx.imageSmoothingQuality = 'high';
+        outputCtx.drawImage(
+            superCanvas,
+            0, 0, superWidth, superHeight,
+            0, 0, outputCanvas.width, outputCanvas.height
+        );
+    }
 
     // Apply outline if enabled
     if (config.outline) {
@@ -403,7 +441,8 @@ export function downloadAsBMP(canvas: HTMLCanvasElement, filename: string): void
     const height = canvas.height;
 
     // BMP file structure (24-bit uncompressed)
-    const rowSize = Math.ceil(width * 3 / 4) * 4; // Row must be multiple of 4 bytes
+    const padding = (4 - (width * 3) % 4) % 4;
+    const rowSize = (width * 3) + padding;
     const pixelDataSize = rowSize * height;
     const fileSize = 54 + pixelDataSize; // 54 = header size
 
@@ -438,8 +477,8 @@ export function downloadAsBMP(canvas: HTMLCanvasElement, filename: string): void
             view.setUint8(offset++, data[i + 1]); // G
             view.setUint8(offset++, data[i]);     // R
         }
-        // Padding to 4-byte boundary
-        while (offset % 4 !== 0) {
+        // Write padding zeroes
+        for (let p = 0; p < padding; p++) {
             view.setUint8(offset++, 0);
         }
     }

@@ -7,8 +7,8 @@ export default function Header() {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50">
-            <div style={{ maxWidth: '1280px', margin: '0 auto', width: '100%', padding: '1rem' }} className="flex items-center justify-between">
+        <header className="fixed top-0 left-0 right-0 z-50 bg-[var(--background)/95] backdrop-blur-md border-b-2 border-[var(--border)]">
+            <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%', padding: '1rem' }} className="flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="flex items-center gap-3 no-underline">
                     <div className="w-10 h-10 border-2 border-[var(--foreground)] flex items-center justify-center bg-[var(--background)]">
