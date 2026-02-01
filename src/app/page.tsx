@@ -22,6 +22,7 @@ export default function Home() {
   const [outputWidth, setOutputWidth] = useState(DEFAULT_CONFIG.outputWidth);
   const [outputHeight, setOutputHeight] = useState(DEFAULT_CONFIG.outputHeight);
   const [aspectRatio, setAspectRatio] = useState(DEFAULT_CONFIG.aspectRatio);
+  const [aspectMode, setAspectMode] = useState<'crop' | 'stretch'>(DEFAULT_CONFIG.aspectMode);
   const [customAspectWidth, setCustomAspectWidth] = useState(1);
   const [customAspectHeight, setCustomAspectHeight] = useState(1);
 
@@ -82,6 +83,7 @@ export default function Home() {
         outputWidth,
         outputHeight,
         aspectRatio,
+        aspectMode,
         customAspectWidth,
         customAspectHeight,
         paletteMode,
@@ -106,7 +108,7 @@ export default function Home() {
       setIsProcessing(false);
     }
   }, [
-    originalImage, pixelSize, outputWidth, outputHeight, aspectRatio,
+    originalImage, pixelSize, outputWidth, outputHeight, aspectRatio, aspectMode,
     customAspectWidth, customAspectHeight, paletteMode, selectedPaletteId,
     customPalette, extractedColorCount, preFilters, postFilters, showGrid, getCurrentPalette
   ]);
@@ -143,65 +145,57 @@ export default function Home() {
       <main className="flex-1 pt-24 pb-12 px-4">
         <div className="max-w-7xl mx-auto">
           {/* Hero Section */}
-          <section className="text-center mb-12">
-            <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-[var(--accent-primary)] via-[var(--accent-tertiary)] to-[var(--accent-secondary)] bg-clip-text text-transparent">
-              Transform Images into Pixel Art
+          <section className="text-center mb-8">
+            <h2 className="text-3xl md:text-4xl mb-4" style={{ borderBottom: 'none' }}>
+              PIXEL ART GENERATOR
             </h2>
-            <p className="text-[var(--text-secondary)] text-lg max-w-2xl mx-auto">
-              Upload any image and convert it to stunning retro pixel art with smart color palettes,
-              customizable filters, and precise controls.
+            <p className="text-[var(--text-dim)] text-lg max-w-2xl mx-auto">
+              Convert images to pixel art with custom palettes and filters
             </p>
           </section>
 
           {/* App Layout */}
-          <div className="grid lg:grid-cols-[1fr_400px] gap-6">
+          <div className="grid lg:grid-cols-[1fr_380px] gap-6">
             {/* Preview Panel */}
-            <div className="glass-card p-6">
+            <div className="glass-card">
               {!originalImage ? (
                 <ImageDropZone onImageLoad={handleImageLoad} />
               ) : (
                 <div className="flex flex-col gap-4">
                   {/* Controls Bar */}
-                  <div className="flex flex-wrap items-center gap-4 justify-between">
+                  <div className="flex flex-wrap items-center gap-3 justify-between">
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => setOriginalImage(null)}
-                        className="btn-secondary text-sm py-2 px-4"
+                        className="btn-secondary text-sm"
                       >
-                        New Image
+                        NEW
                       </button>
-                      <div className="w-px h-6 bg-[var(--border-color)]" />
                       <button
                         onClick={() => setShowOriginal(!showOriginal)}
-                        className={`px-3 py-2 rounded-lg text-sm transition-all ${showOriginal
-                            ? 'bg-[var(--accent-primary)] text-[var(--bg-primary)]'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-                          }`}
+                        className={showOriginal ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
                       >
-                        Original
+                        ORIG
                       </button>
                       <button
                         onClick={() => setShowGrid(!showGrid)}
-                        className={`px-3 py-2 rounded-lg text-sm transition-all ${showGrid
-                            ? 'bg-[var(--accent-primary)] text-[var(--bg-primary)]'
-                            : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)]'
-                          }`}
+                        className={showGrid ? 'btn-primary text-sm' : 'btn-secondary text-sm'}
                       >
-                        Grid
+                        GRID
                       </button>
                     </div>
                     <div className="flex items-center gap-2">
                       <button
                         onClick={handleExportPNG}
                         disabled={!pixelatedCanvas || isProcessing}
-                        className="btn-primary text-sm py-2 px-4 disabled:opacity-50"
+                        className="btn-primary text-sm"
                       >
-                        Export PNG
+                        EXPORT PNG
                       </button>
                       <button
                         onClick={handleExportJPG}
                         disabled={!pixelatedCanvas || isProcessing}
-                        className="btn-secondary text-sm py-2 px-4 disabled:opacity-50"
+                        className="btn-secondary text-sm"
                       >
                         JPG
                       </button>
@@ -223,16 +217,16 @@ export default function Home() {
             </div>
 
             {/* Controls Panel */}
-            <div className="glass-card p-6 overflow-y-auto max-h-[calc(100vh-200px)]">
+            <div className="glass-card overflow-y-auto max-h-[calc(100vh-200px)]">
               {/* Tabs */}
-              <div className="flex border-b border-[var(--border-color)] mb-6 -mx-6 px-6">
+              <div className="flex border-b-2 border-[var(--border)] mb-4 -mx-6 px-4">
                 {(['palette', 'size', 'prefilters', 'postfilters'] as const).map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab)}
                     className={`tab-button ${activeTab === tab ? 'active' : ''}`}
                   >
-                    {tab === 'prefilters' ? 'Pre' : tab === 'postfilters' ? 'Post' : tab.charAt(0).toUpperCase() + tab.slice(1)}
+                    {tab === 'prefilters' ? 'PRE' : tab === 'postfilters' ? 'POST' : tab.toUpperCase()}
                   </button>
                 ))}
               </div>
@@ -258,12 +252,14 @@ export default function Home() {
                     outputWidth={outputWidth}
                     outputHeight={outputHeight}
                     aspectRatio={aspectRatio}
+                    aspectMode={aspectMode}
                     customAspectWidth={customAspectWidth}
                     customAspectHeight={customAspectHeight}
                     onPixelSizeChange={setPixelSize}
                     onOutputWidthChange={setOutputWidth}
                     onOutputHeightChange={setOutputHeight}
                     onAspectRatioChange={setAspectRatio}
+                    onAspectModeChange={setAspectMode}
                     onCustomAspectChange={(w, h) => {
                       setCustomAspectWidth(w);
                       setCustomAspectHeight(h);
@@ -289,76 +285,16 @@ export default function Home() {
               </div>
             </div>
           </div>
-
-          {/* How It Works Section */}
-          <section id="how-it-works" className="mt-20">
-            <h3 className="text-2xl font-bold text-center mb-12 bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-tertiary)] bg-clip-text text-transparent">
-              How It Works
-            </h3>
-            <div className="grid md:grid-cols-3 gap-6">
-              {[
-                {
-                  icon: '📤',
-                  title: 'Upload Image',
-                  description: 'Drag and drop or click to upload any image file (PNG, JPG, WEBP, GIF)'
-                },
-                {
-                  icon: '🎨',
-                  title: 'Customize',
-                  description: 'Adjust pixel size, choose a color palette, and apply filters to your liking'
-                },
-                {
-                  icon: '💾',
-                  title: 'Export',
-                  description: 'Download your pixel art masterpiece in PNG or JPG format'
-                }
-              ].map((step, idx) => (
-                <div key={idx} className="glass-card p-6 text-center">
-                  <div className="text-4xl mb-4">{step.icon}</div>
-                  <h4 className="text-lg font-semibold mb-2">{step.title}</h4>
-                  <p className="text-[var(--text-secondary)] text-sm">{step.description}</p>
-                </div>
-              ))}
-            </div>
-          </section>
-
-          {/* Features Section */}
-          <section id="features" className="mt-20">
-            <h3 className="text-2xl font-bold text-center mb-12 bg-gradient-to-r from-[var(--accent-secondary)] to-[var(--accent-tertiary)] bg-clip-text text-transparent">
-              Powerful Features
-            </h3>
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { icon: '🎮', title: 'Classic Palettes', desc: 'Game Boy, NES, SNES, PICO-8, and more' },
-                { icon: '🔍', title: 'Smart Extraction', desc: 'AI-powered color palette extraction' },
-                { icon: '⚙️', title: 'Pre/Post Filters', desc: 'Sharpen, blur, contrast, dither, and more' },
-                { icon: '📐', title: 'Aspect Ratios', desc: 'Square, 16:9, 4:3, or custom ratios' },
-                { icon: '🔲', title: 'Pixel Size Control', desc: 'From fine detail to chunky retro pixels' },
-                { icon: '📱', title: 'Mobile Ready', desc: 'Works on all devices' },
-                { icon: '⚡', title: 'Real-time Preview', desc: 'See changes instantly' },
-                { icon: '🌐', title: 'No Upload Required', desc: 'Everything processes locally' }
-              ].map((feature, idx) => (
-                <div key={idx} className="glass-card p-4 flex items-start gap-3">
-                  <span className="text-2xl">{feature.icon}</span>
-                  <div>
-                    <h4 className="font-semibold text-sm">{feature.title}</h4>
-                    <p className="text-xs text-[var(--text-muted)]">{feature.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
         </div>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-[var(--border-color)] py-8 px-4">
-        <div className="max-w-7xl mx-auto text-center text-sm text-[var(--text-muted)]">
-          <p className="mb-2">
-            Made with 💜 by <a href="https://github.com/unworthyzeus" className="text-[var(--accent-primary)] hover:underline">unworthyzeus</a>
-          </p>
+      <footer className="py-6 px-4">
+        <div className="max-w-7xl mx-auto text-center text-sm text-[var(--text-dim)]">
           <p>
-            Open source on <a href="https://github.com/unworthyzeus/pixel-smart-art" className="text-[var(--accent-primary)] hover:underline">GitHub</a>
+            <a href="https://github.com/unworthyzeus/pixel-smart-art">SOURCE CODE</a>
+            {' '}/{' '}
+            <a href="/guide">GUIDE</a>
           </p>
         </div>
       </footer>

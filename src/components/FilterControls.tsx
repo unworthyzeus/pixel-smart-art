@@ -38,7 +38,7 @@ export default function FilterControls({ label, filters, onFiltersChange }: Filt
 
     return (
         <div className="flex flex-col gap-3">
-            <div className="section-title">{label}</div>
+            <div className="section-title">{label.toUpperCase()}</div>
 
             {/* Active Filters */}
             {activeFilters.length > 0 && (
@@ -48,33 +48,30 @@ export default function FilterControls({ label, filters, onFiltersChange }: Filt
                         return (
                             <div
                                 key={idx}
-                                className="flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-color)]"
+                                className="p-3 border-2 border-[var(--border)] bg-[var(--input-bg)]"
                             >
-                                <div className="flex-1">
-                                    <div className="flex items-center justify-between mb-2">
-                                        <span className="text-sm font-medium">{filterDef.name}</span>
-                                        <button
-                                            onClick={() => handleRemoveFilter(idx)}
-                                            className="text-[var(--text-muted)] hover:text-red-400 transition-colors"
-                                        >
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                                            </svg>
-                                        </button>
-                                    </div>
-                                    <div className="flex items-center gap-3">
-                                        <input
-                                            type="range"
-                                            min="0"
-                                            max="100"
-                                            value={filter.intensity}
-                                            onChange={(e) => handleIntensityChange(idx, parseInt(e.target.value))}
-                                            className="flex-1"
-                                        />
-                                        <span className="text-xs text-[var(--accent-primary)] font-mono w-8">
-                                            {filter.intensity}%
-                                        </span>
-                                    </div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-sm">{filterDef.name.toUpperCase()}</span>
+                                    <button
+                                        onClick={() => handleRemoveFilter(idx)}
+                                        className="text-[var(--text-dim)] hover:text-[var(--accent)]"
+                                        style={{ boxShadow: 'none', padding: '0.25rem', border: 'none', background: 'transparent' }}
+                                    >
+                                        X
+                                    </button>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <input
+                                        type="range"
+                                        min="0"
+                                        max="100"
+                                        value={filter.intensity}
+                                        onChange={(e) => handleIntensityChange(idx, parseInt(e.target.value))}
+                                        className="flex-1"
+                                    />
+                                    <span className="text-sm text-[var(--foreground)] w-10 text-right">
+                                        {filter.intensity}%
+                                    </span>
                                 </div>
                             </div>
                         );
@@ -85,20 +82,21 @@ export default function FilterControls({ label, filters, onFiltersChange }: Filt
             {/* Add Filter */}
             {availableFilters.length > 0 && (
                 <div className="flex flex-col gap-2">
-                    <span className="text-xs text-[var(--text-muted)]">Add Filter:</span>
+                    <span className="text-sm text-[var(--text-dim)]">ADD FILTER:</span>
 
                     {Object.entries(filtersByCategory).map(([category, categoryFilters]) => (
                         categoryFilters.length > 0 && (
                             <div key={category} className="flex flex-wrap gap-1">
-                                <span className="text-xs text-[var(--text-secondary)] w-full mb-1 capitalize">{category}</span>
+                                <span className="text-sm text-[var(--text-dim)] w-full mb-1">{category.toUpperCase()}</span>
                                 {categoryFilters.map((filter) => (
                                     <button
                                         key={filter.id}
                                         onClick={() => handleAddFilter(filter.id)}
-                                        className="px-2 py-1 text-xs rounded bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] transition-all"
+                                        className="text-sm btn-secondary"
+                                        style={{ padding: '0.2rem 0.4rem', boxShadow: '2px 2px 0px var(--dim)' }}
                                         title={filter.description}
                                     >
-                                        {filter.name}
+                                        {filter.name.toUpperCase()}
                                     </button>
                                 ))}
                             </div>
@@ -108,8 +106,8 @@ export default function FilterControls({ label, filters, onFiltersChange }: Filt
             )}
 
             {activeFilters.length === 0 && (
-                <p className="text-xs text-[var(--text-muted)]">
-                    No filters applied. Add filters to modify the image.
+                <p className="text-sm text-[var(--text-dim)]">
+                    NO FILTERS APPLIED
                 </p>
             )}
         </div>

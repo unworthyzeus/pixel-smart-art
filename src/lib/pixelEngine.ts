@@ -11,6 +11,7 @@ export interface PixelArtConfig {
 
     // Aspect ratio
     aspectRatio: string;        // 'original', '1:1', '4:3', '16:9', '3:2', '2:3', '9:16', '3:4', 'custom'
+    aspectMode: 'crop' | 'stretch';  // How to handle aspect ratio mismatch
     customAspectWidth?: number;
     customAspectHeight?: number;
 
@@ -37,6 +38,7 @@ export const DEFAULT_CONFIG: PixelArtConfig = {
     outputWidth: 256,
     outputHeight: 256,
     aspectRatio: 'original',
+    aspectMode: 'crop',
     paletteMode: 'extracted',
     extractedColorCount: 16,
     preFilters: [],
@@ -249,24 +251,30 @@ export async function generatePixelArt(
     sourceCanvas.width = outputWidth;
     sourceCanvas.height = outputHeight;
 
-    // Draw source image to canvas (handles cropping for aspect ratio)
+    // Draw source image to canvas (handles cropping or stretching for aspect ratio)
     if (config.aspectRatio !== 'original') {
-        const sourceRatio = originalWidth / originalHeight;
-        const targetRatio = targetAspect.width / targetAspect.height;
-
-        let sx = 0, sy = 0, sw = originalWidth, sh = originalHeight;
-
-        if (sourceRatio > targetRatio) {
-            // Source is wider, crop sides
-            sw = originalHeight * targetRatio;
-            sx = (originalWidth - sw) / 2;
+        if (config.aspectMode === 'stretch') {
+            // Stretch: simply draw the full image to fit the new aspect
+            sourceCtx.drawImage(sourceImage, 0, 0, outputWidth, outputHeight);
         } else {
-            // Source is taller, crop top/bottom
-            sh = originalWidth / targetRatio;
-            sy = (originalHeight - sh) / 2;
-        }
+            // Crop: center crop to maintain aspect
+            const sourceRatio = originalWidth / originalHeight;
+            const targetRatio = targetAspect.width / targetAspect.height;
 
-        sourceCtx.drawImage(sourceImage, sx, sy, sw, sh, 0, 0, outputWidth, outputHeight);
+            let sx = 0, sy = 0, sw = originalWidth, sh = originalHeight;
+
+            if (sourceRatio > targetRatio) {
+                // Source is wider, crop sides
+                sw = originalHeight * targetRatio;
+                sx = (originalWidth - sw) / 2;
+            } else {
+                // Source is taller, crop top/bottom
+                sh = originalWidth / targetRatio;
+                sy = (originalHeight - sh) / 2;
+            }
+
+            sourceCtx.drawImage(sourceImage, sx, sy, sw, sh, 0, 0, outputWidth, outputHeight);
+        }
     } else {
         sourceCtx.drawImage(sourceImage, 0, 0, outputWidth, outputHeight);
     }

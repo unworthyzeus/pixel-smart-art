@@ -1,6 +1,6 @@
 'use client';
 
-import { PALETTES, ColorPalette } from '@/lib/palettes';
+import { PALETTES } from '@/lib/palettes';
 
 interface PaletteSelectorProps {
     paletteMode: 'predefined' | 'extracted' | 'custom';
@@ -42,7 +42,7 @@ export default function PaletteSelector({
 
     return (
         <div className="flex flex-col gap-4">
-            <div className="section-title">Color Palette</div>
+            <div className="section-title">COLOR PALETTE</div>
 
             {/* Mode Selection */}
             <div className="flex gap-2 flex-wrap">
@@ -50,12 +50,10 @@ export default function PaletteSelector({
                     <button
                         key={mode}
                         onClick={() => onPaletteModeChange(mode)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${paletteMode === mode
-                                ? 'bg-[var(--accent-primary)] text-[var(--bg-primary)]'
-                                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]'
-                            }`}
+                        className={`text-sm ${paletteMode === mode ? 'btn-primary' : 'btn-secondary'}`}
+                        style={{ padding: '0.4rem 0.8rem', boxShadow: '2px 2px 0px var(--dim)' }}
                     >
-                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                        {mode.toUpperCase()}
                     </button>
                 ))}
             </div>
@@ -70,17 +68,17 @@ export default function PaletteSelector({
                     >
                         {PALETTES.map((palette) => (
                             <option key={palette.id} value={palette.id}>
-                                {palette.name} ({palette.colors.length} colors)
+                                {palette.name.toUpperCase()} ({palette.colors.length})
                             </option>
                         ))}
                     </select>
 
-                    <p className="text-xs text-[var(--text-muted)]">
+                    <p className="text-sm text-[var(--text-dim)]">
                         {selectedPalette.description}
                     </p>
 
-                    <div className="flex flex-wrap gap-2">
-                        {selectedPalette.colors.slice(0, 24).map((color, idx) => (
+                    <div className="flex flex-wrap gap-1">
+                        {selectedPalette.colors.slice(0, 32).map((color, idx) => (
                             <div
                                 key={idx}
                                 className="palette-color"
@@ -88,9 +86,9 @@ export default function PaletteSelector({
                                 title={color}
                             />
                         ))}
-                        {selectedPalette.colors.length > 24 && (
-                            <div className="w-8 h-8 flex items-center justify-center text-xs text-[var(--text-muted)]">
-                                +{selectedPalette.colors.length - 24}
+                        {selectedPalette.colors.length > 32 && (
+                            <div className="w-7 h-7 flex items-center justify-center text-sm text-[var(--text-dim)] border-2 border-[var(--border)]">
+                                +{selectedPalette.colors.length - 32}
                             </div>
                         )}
                     </div>
@@ -101,19 +99,26 @@ export default function PaletteSelector({
             {paletteMode === 'extracted' && (
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center gap-4">
-                        <label className="text-sm">Colors:</label>
+                        <label className="text-sm">COLORS:</label>
                         <input
                             type="range"
                             min="2"
-                            max="32"
+                            max="128"
                             value={extractedColorCount}
                             onChange={(e) => onExtractedCountChange(parseInt(e.target.value))}
                             className="flex-1"
                         />
-                        <span className="text-[var(--accent-primary)] font-mono w-8">{extractedColorCount}</span>
+                        <input
+                            type="number"
+                            min="2"
+                            max="256"
+                            value={extractedColorCount}
+                            onChange={(e) => onExtractedCountChange(Math.max(2, Math.min(256, parseInt(e.target.value) || 16)))}
+                            className="w-16 text-center"
+                        />
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">
-                        Automatically extract dominant colors from your image using AI clustering
+                    <p className="text-sm text-[var(--text-dim)]">
+                        Extract dominant colors from image automatically
                     </p>
                 </div>
             )}
@@ -128,24 +133,27 @@ export default function PaletteSelector({
                                     type="color"
                                     value={color}
                                     onChange={(e) => handleColorChange(idx, e.target.value)}
-                                    className="w-10 h-10 rounded-lg cursor-pointer border-2 border-transparent hover:border-[var(--accent-primary)] transition-all"
+                                    className="w-10 h-10 cursor-pointer"
+                                    style={{ padding: 0 }}
                                 />
                                 <button
                                     onClick={() => handleRemoveColor(idx)}
-                                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-red-500 text-white text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                    className="absolute -top-1 -right-1 w-4 h-4 text-xs bg-[var(--accent)] text-[var(--background)] opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                                    style={{ boxShadow: 'none', padding: 0, border: 'none' }}
                                 >
-                                    ×
+                                    X
                                 </button>
                             </div>
                         ))}
                         <button
                             onClick={handleAddColor}
-                            className="w-10 h-10 rounded-lg border-2 border-dashed border-[var(--border-color)] flex items-center justify-center text-[var(--text-muted)] hover:border-[var(--accent-primary)] hover:text-[var(--accent-primary)] transition-all"
+                            className="w-10 h-10 flex items-center justify-center text-xl"
+                            style={{ boxShadow: '2px 2px 0px var(--dim)', padding: 0 }}
                         >
                             +
                         </button>
                     </div>
-                    <p className="text-xs text-[var(--text-muted)]">
+                    <p className="text-sm text-[var(--text-dim)]">
                         Create your own custom color palette
                     </p>
                 </div>
