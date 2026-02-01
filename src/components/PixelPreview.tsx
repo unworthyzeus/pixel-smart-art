@@ -102,7 +102,7 @@ export default function PixelPreview({
             <div
                 ref={containerRef}
                 className={`pixel-preview ${hasContent ? 'has-image' : ''} relative`}
-                style={{ minHeight: '400px', overflow: 'hidden' }}
+                style={{ minHeight: '600px', overflow: 'hidden' }}
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}

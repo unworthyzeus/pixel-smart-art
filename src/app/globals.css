@@ -340,6 +340,11 @@ input[type="color"]::-webkit-color-swatch {
   cursor: pointer;
   transition: all 0.2s;
   background: var(--input-bg);
+  min-height: 600px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .drop-zone:hover,

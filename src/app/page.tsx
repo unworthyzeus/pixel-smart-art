@@ -149,7 +149,7 @@ export default function Home() {
 
       {/* Main Content */}
       <main className="flex-1 px-4 py-6" style={{ width: '100%', paddingTop: '80px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', width: '100%' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', width: '100%' }}>
           {/* Subtitle */}
           <p className="text-center text-[var(--text-dim)] mb-6">
             Convert images to pixel art with custom palettes and filters
