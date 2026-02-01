@@ -22,10 +22,15 @@ export default function AudioPage() {
     const [isPlaying, setIsPlaying] = useState(false);
     const [playingOriginal, setPlayingOriginal] = useState(false);
     const [config, setConfig] = useState<ChiptuneConfig>(DEFAULT_CHIPTUNE_CONFIG);
+    const [currentTime, setCurrentTime] = useState(0);
+    const [duration, setDuration] = useState(0);
 
     const audioContextRef = useRef<AudioContext | null>(null);
     const sourceNodeRef = useRef<AudioBufferSourceNode | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const startTimeRef = useRef<number>(0);
+    const animationFrameRef = useRef<number | null>(null);
+    const currentBufferRef = useRef<AudioBuffer | null>(null);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -81,6 +86,10 @@ export default function AudioPage() {
     }, [originalBuffer, config]);
 
     const stopPlayback = useCallback(() => {
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
         if (sourceNodeRef.current) {
             try {
                 sourceNodeRef.current.stop();
@@ -89,9 +98,10 @@ export default function AudioPage() {
         }
         setIsPlaying(false);
         setPlayingOriginal(false);
+        setCurrentTime(0);
     }, []);
 
-    const playBuffer = useCallback(async (buffer: AudioBuffer, isOriginal: boolean) => {
+    const playBuffer = useCallback(async (buffer: AudioBuffer, isOriginal: boolean, startOffset: number = 0) => {
         stopPlayback();
 
         if (!audioContextRef.current || audioContextRef.current.state === 'closed') {
@@ -107,17 +117,47 @@ export default function AudioPage() {
         source.buffer = buffer;
         source.connect(ctx.destination);
 
+        currentBufferRef.current = buffer;
+        setDuration(buffer.duration);
+        startTimeRef.current = ctx.currentTime - startOffset;
+
+        // Animation loop for time tracking
+        const updateTime = () => {
+            if (audioContextRef.current && sourceNodeRef.current) {
+                const elapsed = audioContextRef.current.currentTime - startTimeRef.current;
+                setCurrentTime(Math.min(elapsed, buffer.duration));
+                if (elapsed < buffer.duration) {
+                    animationFrameRef.current = requestAnimationFrame(updateTime);
+                }
+            }
+        };
+
         source.onended = () => {
+            if (animationFrameRef.current) {
+                cancelAnimationFrame(animationFrameRef.current);
+            }
             setIsPlaying(false);
             setPlayingOriginal(false);
+            setCurrentTime(0);
         };
 
         sourceNodeRef.current = source;
-        source.start(0);
+        source.start(0, startOffset);
 
         setIsPlaying(true);
         setPlayingOriginal(isOriginal);
+        setCurrentTime(startOffset);
+
+        // Start time tracking after state update
+        animationFrameRef.current = requestAnimationFrame(updateTime);
     }, [stopPlayback]);
+
+    const seekTo = useCallback((time: number) => {
+        if (!currentBufferRef.current) return;
+        const buffer = currentBufferRef.current;
+        const wasOriginal = playingOriginal;
+        playBuffer(buffer, wasOriginal, time);
+    }, [playBuffer, playingOriginal]);
 
     const downloadProcessed = useCallback(() => {
         if (!processedAudio || !audioFile) return;
@@ -259,6 +299,46 @@ export default function AudioPage() {
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Progress Bar */}
+                                    {(originalBuffer || processedAudio) && (
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex items-center gap-4">
+                                                <span className="text-sm text-[var(--foreground)] w-12 text-right font-mono">
+                                                    {formatDuration(currentTime)}
+                                                </span>
+                                                <div
+                                                    className="flex-1 h-4 bg-[var(--input-bg)] border-2 border-[var(--border)] cursor-pointer relative"
+                                                    onClick={(e) => {
+                                                        if (!isPlaying || !duration) return;
+                                                        const rect = e.currentTarget.getBoundingClientRect();
+                                                        const x = e.clientX - rect.left;
+                                                        const percent = x / rect.width;
+                                                        seekTo(percent * duration);
+                                                    }}
+                                                >
+                                                    <div
+                                                        className="h-full bg-[var(--foreground)] transition-all duration-100"
+                                                        style={{ width: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                                                    />
+                                                    {isPlaying && (
+                                                        <div
+                                                            className="absolute top-0 h-full w-1 bg-[var(--accent)]"
+                                                            style={{ left: duration > 0 ? `${(currentTime / duration) * 100}%` : '0%' }}
+                                                        />
+                                                    )}
+                                                </div>
+                                                <span className="text-sm text-[var(--text-dim)] w-12 font-mono">
+                                                    {formatDuration(duration)}
+                                                </span>
+                                            </div>
+                                            {isPlaying && (
+                                                <p className="text-xs text-[var(--text-dim)] text-center">
+                                                    CLICK ON PROGRESS BAR TO SEEK
+                                                </p>
+                                            )}
+                                        </div>
+                                    )}
 
                                     {/* Process Button */}
                                     <button
