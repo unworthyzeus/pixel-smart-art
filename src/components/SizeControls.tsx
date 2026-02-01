@@ -64,16 +64,18 @@ export default function SizeControls({
                         type="range"
                         min="1"
                         max="64"
+                        step="0.5"
                         value={pixelSize}
-                        onChange={(e) => onPixelSizeChange(parseInt(e.target.value))}
+                        onChange={(e) => onPixelSizeChange(parseFloat(e.target.value))}
                         className="flex-1"
                     />
                     <input
                         type="number"
                         min="1"
                         max="64"
+                        step="0.1"
                         value={pixelSize}
-                        onChange={(e) => onPixelSizeChange(Math.max(1, Math.min(64, parseInt(e.target.value) || 1)))}
+                        onChange={(e) => onPixelSizeChange(Math.max(1, Math.min(64, parseFloat(e.target.value) || 1)))}
                         className="w-16 text-center"
                     />
                 </div>
