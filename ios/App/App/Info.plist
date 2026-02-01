@@ -47,5 +47,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>To take photos for pixel art conversion</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>To save your pixel art masterpieces</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>To pick photos for pixel art conversion</string>
 </dict>
 </plist>
