@@ -38,10 +38,10 @@ export interface PixelArtConfig {
 
 export const DEFAULT_CONFIG: PixelArtConfig = {
     pixelSize: 8,
-    outputWidth: 256,
-    outputHeight: 256,
+    outputWidth: 512,
+    outputHeight: 512,
     aspectRatio: 'original',
-    aspectMode: 'crop',
+    aspectMode: 'stretch',
     paletteMode: 'extracted',
     extractedColorCount: 16,
     samplingMode: 'nearest',

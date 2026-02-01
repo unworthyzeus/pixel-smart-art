@@ -29,12 +29,12 @@ const ASPECT_RATIOS = [
 ];
 
 const PRESET_SIZES = [
-    { label: '16', width: 16, height: 16 },
-    { label: '32', width: 32, height: 32 },
     { label: '64', width: 64, height: 64 },
     { label: '128', width: 128, height: 128 },
     { label: '256', width: 256, height: 256 },
     { label: '512', width: 512, height: 512 },
+    { label: '1024', width: 1024, height: 1024 },
+    { label: '2048', width: 2048, height: 2048 },
 ];
 
 export default function SizeControls({
