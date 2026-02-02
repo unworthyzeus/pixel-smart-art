@@ -16,7 +16,8 @@ export type FilterType =
     | 'emboss'
     | 'vignette'
     | 'noise'
-    | 'dither';
+    | 'dither'
+    | 'kuwahara';
 
 export interface FilterConfig {
     type: FilterType;
@@ -48,6 +49,7 @@ export const FILTERS: FilterDefinition[] = [
     { id: 'vignette', name: 'Vignette', description: 'Dark corners effect', defaultIntensity: 50, category: 'artistic' },
     { id: 'noise', name: 'Noise', description: 'Add grain/noise', defaultIntensity: 20, category: 'pixel' },
     { id: 'dither', name: 'Dither', description: 'Apply dithering pattern', defaultIntensity: 50, category: 'pixel' },
+    { id: 'kuwahara', name: 'Smart Smooth', description: 'Edge-preserving smoothing', defaultIntensity: 40, category: 'pixel' },
 ];
 
 // Apply a convolution kernel to image data
@@ -368,6 +370,84 @@ export function applyDither(imageData: ImageData, intensity: number): ImageData 
     return output;
 }
 
+// Kuwahara (Oil Painting) filter
+export function applyKuwahara(imageData: ImageData, intensity: number): ImageData {
+    const { width, height, data } = imageData;
+    const output = new ImageData(width, height);
+    const radius = Math.max(1, Math.floor((intensity / 100) * 6));
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const means: { r: number, g: number, b: number }[] = [];
+            const variances: number[] = [];
+
+            // 4 Quadrants: TL, TR, BL, BR
+            // Ranges: [start, end] inclusive relative to x,y
+            const ranges = [
+                { x: [-radius, 0], y: [-radius, 0] },
+                { x: [0, radius], y: [-radius, 0] },
+                { x: [-radius, 0], y: [0, radius] },
+                { x: [0, radius], y: [0, radius] }
+            ];
+
+            for (let i = 0; i < 4; i++) {
+                let rSum = 0, gSum = 0, bSum = 0;
+                let r2Sum = 0, g2Sum = 0, b2Sum = 0;
+                let count = 0;
+
+                for (let dy = ranges[i].y[0]; dy <= ranges[i].y[1]; dy++) {
+                    for (let dx = ranges[i].x[0]; dx <= ranges[i].x[1]; dx++) {
+                        const nx = x + dx;
+                        const ny = y + dy;
+
+                        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                            const idx = (ny * width + nx) * 4;
+                            const r = data[idx];
+                            const g = data[idx + 1];
+                            const b = data[idx + 2];
+
+                            rSum += r; gSum += g; bSum += b;
+                            r2Sum += r * r; g2Sum += g * g; b2Sum += b * b;
+                            count++;
+                        }
+                    }
+                }
+
+                if (count === 0) {
+                    means.push({ r: 0, g: 0, b: 0 });
+                    variances.push(999999);
+                    continue;
+                }
+
+                const rMean = rSum / count;
+                const gMean = gSum / count;
+                const bMean = bSum / count;
+                const variance = (r2Sum + g2Sum + b2Sum) / count - (rMean * rMean + gMean * gMean + bMean * bMean);
+
+                means.push({ r: rMean, g: gMean, b: bMean });
+                variances.push(variance);
+            }
+
+            // Find min variance
+            let minVar = variances[0];
+            let minIdx = 0;
+            for (let j = 1; j < 4; j++) {
+                if (variances[j] < minVar) {
+                    minVar = variances[j];
+                    minIdx = j;
+                }
+            }
+
+            const idx = (y * width + x) * 4;
+            output.data[idx] = means[minIdx].r;
+            output.data[idx + 1] = means[minIdx].g;
+            output.data[idx + 2] = means[minIdx].b;
+            output.data[idx + 3] = data[idx + 3];
+        }
+    }
+    return output;
+}
+
 // Main filter application function
 export function applyFilter(imageData: ImageData, filter: FilterConfig): ImageData {
     if (filter.type === 'none' || filter.intensity === 0) return imageData;
@@ -388,6 +468,7 @@ export function applyFilter(imageData: ImageData, filter: FilterConfig): ImageDa
         case 'vignette': return applyVignette(imageData, filter.intensity);
         case 'noise': return applyNoise(imageData, filter.intensity);
         case 'dither': return applyDither(imageData, filter.intensity);
+        case 'kuwahara': return applyKuwahara(imageData, filter.intensity);
         default: return imageData;
     }
 }
