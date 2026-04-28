@@ -7,6 +7,12 @@ export interface ColorPalette {
     description: string;
 }
 
+export interface RgbColor {
+    r: number;
+    g: number;
+    b: number;
+}
+
 export const PALETTES: ColorPalette[] = [
     {
         id: 'gameboy',
@@ -106,7 +112,7 @@ export const PALETTES: ColorPalette[] = [
     }
 ];
 
-export function hexToRgb(hex: string): { r: number; g: number; b: number } {
+export function hexToRgb(hex: string): RgbColor {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result ? {
         r: parseInt(result[1], 16),
@@ -122,29 +128,50 @@ export function rgbToHex(r: number, g: number, b: number): string {
     }).join('');
 }
 
-export function colorDistance(c1: { r: number; g: number; b: number }, c2: { r: number; g: number; b: number }): number {
+function colorDistanceScore(c1: RgbColor, c2: RgbColor): number {
     // Using weighted Euclidean distance that accounts for human perception
     const rMean = (c1.r + c2.r) / 2;
     const dR = c1.r - c2.r;
     const dG = c1.g - c2.g;
     const dB = c1.b - c2.b;
-    return Math.sqrt(
-        (2 + rMean / 256) * dR * dR +
+    return (2 + rMean / 256) * dR * dR +
         4 * dG * dG +
-        (2 + (255 - rMean) / 256) * dB * dB
-    );
+        (2 + (255 - rMean) / 256) * dB * dB;
 }
 
-export function findClosestColor(color: { r: number; g: number; b: number }, palette: string[]): string {
-    let closestColor = palette[0];
+export function colorDistance(c1: RgbColor, c2: RgbColor): number {
+    return Math.sqrt(colorDistanceScore(c1, c2));
+}
+
+export function preparePalette(palette: string[]): RgbColor[] {
+    return palette.map(hexToRgb);
+}
+
+export function findClosestRgbColor(color: RgbColor, preparedPalette: RgbColor[]): RgbColor {
+    let closestColor = preparedPalette[0] || { r: 0, g: 0, b: 0 };
     let minDistance = Infinity;
 
-    for (const paletteColor of palette) {
-        const pColor = hexToRgb(paletteColor);
-        const distance = colorDistance(color, pColor);
+    for (let i = 0; i < preparedPalette.length; i++) {
+        const distance = colorDistanceScore(color, preparedPalette[i]);
         if (distance < minDistance) {
             minDistance = distance;
-            closestColor = paletteColor;
+            closestColor = preparedPalette[i];
+        }
+    }
+
+    return closestColor;
+}
+
+export function findClosestColor(color: RgbColor, palette: string[]): string {
+    let closestColor = palette[0];
+    let minDistance = Infinity;
+    const preparedPalette = preparePalette(palette);
+
+    for (let i = 0; i < preparedPalette.length; i++) {
+        const distance = colorDistanceScore(color, preparedPalette[i]);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestColor = palette[i];
         }
     }
 
@@ -153,48 +180,79 @@ export function findClosestColor(color: { r: number; g: number; b: number }, pal
 
 // Extract dominant colors from an image using k-means clustering
 export function extractPalette(imageData: ImageData, colorCount: number = 16): string[] {
-    const pixels: { r: number; g: number; b: number }[] = [];
+    const pixels: number[] = [];
+    const maxSamples = 12000;
+    const totalPixels = imageData.data.length / 4;
+    const pixelStride = Math.max(1, Math.floor(totalPixels / maxSamples));
 
-    // Sample pixels (every 4th pixel for performance)
-    for (let i = 0; i < imageData.data.length; i += 16) {
+    // Sample a bounded number of pixels so large photos stay responsive.
+    for (let i = 0; i < imageData.data.length; i += pixelStride * 4) {
         const r = imageData.data[i];
         const g = imageData.data[i + 1];
         const b = imageData.data[i + 2];
         const a = imageData.data[i + 3];
         if (a > 128) { // Skip transparent pixels
-            pixels.push({ r, g, b });
+            pixels.push(r, g, b);
         }
     }
 
-    if (pixels.length === 0) return ['#000000'];
+    const sampleCount = pixels.length / 3;
+    if (sampleCount === 0) return ['#000000'];
 
     // Simple k-means clustering
-    let centroids = pixels.slice(0, colorCount).map(p => ({ ...p }));
+    const centroidCount = Math.min(Math.max(1, colorCount), sampleCount);
+    const centroids: RgbColor[] = [];
+    const centroidStep = Math.max(1, Math.floor(sampleCount / centroidCount));
 
-    for (let iter = 0; iter < 10; iter++) {
-        const clusters: { r: number; g: number; b: number }[][] = centroids.map(() => []);
+    for (let i = 0; i < centroidCount; i++) {
+        const sampleIndex = Math.min(sampleCount - 1, i * centroidStep) * 3;
+        centroids.push({
+            r: pixels[sampleIndex],
+            g: pixels[sampleIndex + 1],
+            b: pixels[sampleIndex + 2]
+        });
+    }
+
+    const sumsR = new Float64Array(centroidCount);
+    const sumsG = new Float64Array(centroidCount);
+    const sumsB = new Float64Array(centroidCount);
+    const counts = new Uint32Array(centroidCount);
+
+    for (let iter = 0; iter < 8; iter++) {
+        sumsR.fill(0);
+        sumsG.fill(0);
+        sumsB.fill(0);
+        counts.fill(0);
 
         // Assign pixels to nearest centroid
-        for (const pixel of pixels) {
+        for (let p = 0; p < pixels.length; p += 3) {
+            const pixel = {
+                r: pixels[p],
+                g: pixels[p + 1],
+                b: pixels[p + 2]
+            };
             let minDist = Infinity;
             let closestIdx = 0;
             for (let i = 0; i < centroids.length; i++) {
-                const dist = colorDistance(pixel, centroids[i]);
+                const dist = colorDistanceScore(pixel, centroids[i]);
                 if (dist < minDist) {
                     minDist = dist;
                     closestIdx = i;
                 }
             }
-            clusters[closestIdx].push(pixel);
+            sumsR[closestIdx] += pixel.r;
+            sumsG[closestIdx] += pixel.g;
+            sumsB[closestIdx] += pixel.b;
+            counts[closestIdx]++;
         }
 
         // Update centroids
         for (let i = 0; i < centroids.length; i++) {
-            if (clusters[i].length > 0) {
+            if (counts[i] > 0) {
                 centroids[i] = {
-                    r: clusters[i].reduce((s, p) => s + p.r, 0) / clusters[i].length,
-                    g: clusters[i].reduce((s, p) => s + p.g, 0) / clusters[i].length,
-                    b: clusters[i].reduce((s, p) => s + p.b, 0) / clusters[i].length
+                    r: sumsR[i] / counts[i],
+                    g: sumsG[i] / counts[i],
+                    b: sumsB[i] / counts[i]
                 };
             }
         }
@@ -207,5 +265,5 @@ export function extractPalette(imageData: ImageData, colorCount: number = 16): s
         return lumA - lumB;
     });
 
-    return centroids.map(c => rgbToHex(c.r, c.g, c.b));
+    return Array.from(new Set(centroids.map(c => rgbToHex(c.r, c.g, c.b))));
 }

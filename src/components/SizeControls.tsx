@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 
 interface SizeControlsProps {
     pixelSize: number;
@@ -56,17 +56,9 @@ export default function SizeControls({
 }: SizeControlsProps) {
     const pixelCount = Math.ceil(outputWidth / pixelSize) * Math.ceil(outputHeight / pixelSize);
 
-    // Local state to allow typing decimals like "2." without React forcing it back to "2"
-    const [localSize, setLocalSize] = useState(pixelSize.toString());
-
-    // Sync local state with prop when prop changes externally (e.g. slider)
-    useEffect(() => {
-        const currentNum = parseFloat(localSize);
-        // Only update if they differ significantly, allowing "2." and "2" to coexist
-        if (isNaN(currentNum) || Math.abs(currentNum - pixelSize) > 0.001) {
-            setLocalSize(pixelSize.toString());
-        }
-    }, [pixelSize]);
+    // Local draft allows typing decimals like "2." without forcing it back to "2".
+    const [localSize, setLocalSize] = useState<string | null>(null);
+    const displayedSize = localSize ?? pixelSize.toString();
 
     const handleTextChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
@@ -81,12 +73,12 @@ export default function SizeControls({
 
     const handleBlur = () => {
         // On blur, force strict sync/clamping
-        const num = parseFloat(localSize);
+        const num = parseFloat(displayedSize);
         if (isNaN(num)) {
-            setLocalSize(pixelSize.toString());
+            setLocalSize(null);
         } else {
             const clamped = Math.max(1, Math.min(64, num));
-            setLocalSize(clamped.toString());
+            setLocalSize(null);
             onPixelSizeChange(clamped);
         }
     };
@@ -109,7 +101,7 @@ export default function SizeControls({
                     <input
                         type="text"
                         inputMode="decimal"
-                        value={localSize}
+                        value={displayedSize}
                         onChange={handleTextChange}
                         onBlur={handleBlur}
                         className="w-16 text-center bg-[var(--input-bg)] border border-[var(--dim)] rounded text-[var(--foreground)]"

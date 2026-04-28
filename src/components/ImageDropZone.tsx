@@ -5,7 +5,7 @@ import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import { defineCustomElements } from '@ionic/pwa-elements/loader';
 
 interface ImageDropZoneProps {
-    onImageLoad: (image: HTMLImageElement) => void;
+    onImageLoad: (image: HTMLImageElement, sourceLabel?: string) => void;
     disabled?: boolean;
 }
 
@@ -14,71 +14,81 @@ export default function ImageDropZone({ onImageLoad, disabled }: ImageDropZonePr
     const [isLoading, setIsLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Initialize PWA elements for web camera support
+    // Initialize PWA elements for web camera support.
     useEffect(() => {
         defineCustomElements(window);
     }, []);
 
+    const loadImageFromUrl = useCallback(async (url: string, sourceLabel?: string, revokeUrl: boolean = false) => {
+        const img = new Image();
+        img.decoding = 'async';
+        img.src = url;
+
+        try {
+            await img.decode();
+            onImageLoad(img, sourceLabel);
+        } finally {
+            if (revokeUrl) {
+                URL.revokeObjectURL(url);
+            }
+        }
+    }, [onImageLoad]);
+
     const handleCamera = async (e: React.MouseEvent) => {
-        e.stopPropagation(); // Prevent triggering file input
+        e.stopPropagation();
         if (disabled) return;
 
         try {
+            setIsLoading(true);
             const image = await Camera.getPhoto({
-                quality: 90,
+                quality: 82,
                 allowEditing: false,
                 resultType: CameraResultType.DataUrl,
                 source: CameraSource.Camera
             });
 
             if (image.dataUrl) {
-                setIsLoading(true);
-                const img = new Image();
-                img.onload = () => {
-                    onImageLoad(img);
-                    setIsLoading(false);
-                };
-                img.onerror = () => {
-                    alert('Failed to load camera image');
-                    setIsLoading(false);
-                };
-                img.src = image.dataUrl;
+                await loadImageFromUrl(image.dataUrl, 'CAMERA');
             }
         } catch (error) {
-            // User cancelled or no camera permission
             console.log('Camera error:', error);
+        } finally {
+            setIsLoading(false);
         }
     };
 
-    const handleFile = useCallback((file: File) => {
+    const handleFile = useCallback(async (file: File, sourceLabel: string = file.name) => {
         if (!file.type.startsWith('image/')) {
             alert('Please select an image file');
             return;
         }
 
         setIsLoading(true);
-        const reader = new FileReader();
+        const objectUrl = URL.createObjectURL(file);
 
-        reader.onload = (e) => {
-            const img = new Image();
-            img.onload = () => {
-                onImageLoad(img);
-                setIsLoading(false);
-            };
-            img.onerror = () => {
-                alert('Failed to load image');
-                setIsLoading(false);
-            };
-            img.src = e.target?.result as string;
-        };
-
-        reader.onerror = () => {
+        try {
+            await loadImageFromUrl(objectUrl, sourceLabel, true);
+        } catch {
             alert('Failed to read file');
+        } finally {
             setIsLoading(false);
+        }
+    }, [loadImageFromUrl]);
+
+    useEffect(() => {
+        const handlePaste = (event: ClipboardEvent) => {
+            if (disabled) return;
+
+            const file = Array.from(event.clipboardData?.files || []).find(item => item.type.startsWith('image/'));
+            if (file) {
+                event.preventDefault();
+                handleFile(file, 'PASTED IMAGE');
+            }
         };
 
-        reader.readAsDataURL(file);
-    }, [onImageLoad]);
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [disabled, handleFile]);
 
     const handleDragOver = useCallback((e: React.DragEvent) => {
         e.preventDefault();
@@ -119,6 +129,7 @@ export default function ImageDropZone({ onImageLoad, disabled }: ImageDropZonePr
                 onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) handleFile(file);
+                    e.currentTarget.value = '';
                 }}
             />
 
@@ -130,7 +141,7 @@ export default function ImageDropZone({ onImageLoad, disabled }: ImageDropZonePr
                         <div className="text-4xl text-[var(--text-dim)]">[+]</div>
                         <div className="text-center">
                             <p className="text-[var(--foreground)] mb-1">DROP IMAGE HERE</p>
-                            <p className="text-[var(--text-dim)] text-sm">OR CLICK TO BROWSE</p>
+                            <p className="text-[var(--text-dim)] text-sm">CLICK, PASTE, OR BROWSE</p>
                         </div>
 
                         <div className="flex items-center gap-2 w-full max-w-[200px]">
@@ -145,13 +156,14 @@ export default function ImageDropZone({ onImageLoad, disabled }: ImageDropZonePr
                             disabled={disabled}
                             className="btn-secondary text-sm flex items-center gap-2"
                         >
-                            <span className="text-lg">📷</span> TAKE PHOTO
+                            <span className="text-lg">CAM</span> TAKE PHOTO
                         </button>
 
                         <div className="flex gap-2 text-sm text-[var(--text-dim)] mt-2">
                             <span className="badge">PNG</span>
                             <span className="badge">JPG</span>
                             <span className="badge">WEBP</span>
+                            <span className="badge">PASTE</span>
                         </div>
                     </>
                 )}

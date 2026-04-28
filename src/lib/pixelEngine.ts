@@ -1,6 +1,6 @@
 // Core Pixel Art Generation Engine
 
-import { findClosestColor, hexToRgb, extractPalette } from './palettes';
+import { extractPalette, findClosestColor, findClosestRgbColor, hexToRgb, preparePalette } from './palettes';
 import { applyFilters, FilterConfig } from './filters';
 
 export interface PixelArtConfig {
@@ -37,7 +37,7 @@ export interface PixelArtConfig {
 }
 
 export const DEFAULT_CONFIG: PixelArtConfig = {
-    pixelSize: 4,
+    pixelSize: 3,
     outputWidth: 512,
     outputHeight: 512,
     aspectRatio: 'original',
@@ -124,7 +124,9 @@ export function pixelateImage(
     const downCanvas = document.createElement('canvas');
     downCanvas.width = pixelWidth;
     downCanvas.height = pixelHeight;
-    const downCtx = downCanvas.getContext('2d')!;
+    const downCtx = downCanvas.getContext('2d', {
+        willReadFrequently: samplingMode === 'average' || samplingMode === 'center' || (paletteMode !== 'none' && palette.length > 0)
+    })!;
 
     // Set smoothing based on sampling mode
     if (samplingMode === 'bilinear') {
@@ -203,17 +205,15 @@ export function pixelateImage(
     // Get pixel data for palette mapping (only if using a palette)
     if (paletteMode !== 'none' && palette.length > 0) {
         const imageData = downCtx.getImageData(0, 0, pixelWidth, pixelHeight);
+        const preparedPalette = preparePalette(palette);
 
         for (let i = 0; i < imageData.data.length; i += 4) {
-            const color = {
-                r: imageData.data[i],
-                g: imageData.data[i + 1],
-                b: imageData.data[i + 2]
-            };
-
             if (imageData.data[i + 3] > 0) { // Skip fully transparent
-                const closestHex = findClosestColor(color, palette);
-                const closest = hexToRgb(closestHex);
+                const closest = findClosestRgbColor({
+                    r: imageData.data[i],
+                    g: imageData.data[i + 1],
+                    b: imageData.data[i + 2]
+                }, preparedPalette);
                 imageData.data[i] = closest.r;
                 imageData.data[i + 1] = closest.g;
                 imageData.data[i + 2] = closest.b;
@@ -320,7 +320,7 @@ export async function generatePixelArt(
 ): Promise<HTMLCanvasElement> {
     // Step 1: Create source canvas
     const sourceCanvas = document.createElement('canvas');
-    const sourceCtx = sourceCanvas.getContext('2d')!;
+    const sourceCtx = sourceCanvas.getContext('2d', { willReadFrequently: config.preFilters.length > 0 })!;
 
     // Calculate dimensions based on aspect ratio
     const originalWidth = sourceImage instanceof HTMLImageElement

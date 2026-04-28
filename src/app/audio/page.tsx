@@ -33,6 +33,22 @@ export default function AudioPage() {
     const animationFrameRef = useRef<number | null>(null);
     const currentBufferRef = useRef<AudioBuffer | null>(null);
 
+    const stopPlayback = useCallback(() => {
+        if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+        }
+        if (sourceNodeRef.current) {
+            try {
+                sourceNodeRef.current.stop();
+            } catch { /* ignore */ }
+            sourceNodeRef.current = null;
+        }
+        setIsPlaying(false);
+        setPlayingOriginal(false);
+        setCurrentTime(0);
+    }, []);
+
     // Cleanup on unmount
     useEffect(() => {
         return () => {
@@ -41,7 +57,7 @@ export default function AudioPage() {
                 audioContextRef.current.close();
             }
         };
-    }, []);
+    }, [stopPlayback]);
 
     const handleFileSelect = useCallback(async (file: File) => {
         if (!file.type.startsWith('audio/')) {
@@ -84,23 +100,7 @@ export default function AudioPage() {
         } finally {
             setIsProcessing(false);
         }
-    }, [originalBuffer, config]);
-
-    const stopPlayback = useCallback(() => {
-        if (animationFrameRef.current) {
-            cancelAnimationFrame(animationFrameRef.current);
-            animationFrameRef.current = null;
-        }
-        if (sourceNodeRef.current) {
-            try {
-                sourceNodeRef.current.stop();
-            } catch { /* ignore */ }
-            sourceNodeRef.current = null;
-        }
-        setIsPlaying(false);
-        setPlayingOriginal(false);
-        setCurrentTime(0);
-    }, []);
+    }, [originalBuffer, config, stopPlayback]);
 
     const playBuffer = useCallback(async (buffer: AudioBuffer, isOriginal: boolean, startOffset: number = 0) => {
         stopPlayback();

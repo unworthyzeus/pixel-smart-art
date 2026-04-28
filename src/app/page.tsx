@@ -1,21 +1,30 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import Header from '@/components/Header';
 import ImageDropZone from '@/components/ImageDropZone';
 import PixelPreview from '@/components/PixelPreview';
 import PaletteSelector from '@/components/PaletteSelector';
 import FilterControls from '@/components/FilterControls';
 import SizeControls from '@/components/SizeControls';
+import SmartAssistPanel from '@/components/SmartAssistPanel';
 import { PALETTES, extractPalette } from '@/lib/palettes';
 import { FilterConfig } from '@/lib/filters';
 import { generatePixelArt, downloadCanvas, downloadAsBMP, downloadAsPPM, downloadAsRaw, downloadAsJSON, downloadAsWebP, PixelArtConfig, DEFAULT_CONFIG } from '@/lib/pixelEngine';
+import { analyzeImageForPixelArt, SmartImageAnalysis, SmartLook } from '@/lib/smartImage';
 
 export default function Home() {
   // Image state
   const [originalImage, setOriginalImage] = useState<HTMLImageElement | null>(null);
   const [pixelatedCanvas, setPixelatedCanvas] = useState<HTMLCanvasElement | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingTime, setProcessingTime] = useState<number | null>(null);
+  const [sourceLabel, setSourceLabel] = useState<string | null>(null);
+  const [smartAnalysis, setSmartAnalysis] = useState<SmartImageAnalysis | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [selectedLookId, setSelectedLookId] = useState<string | null>(null);
+  const analysisRequestRef = useRef(0);
+  const processRequestRef = useRef(0);
 
   // Config state
   const [pixelSize, setPixelSize] = useState(DEFAULT_CONFIG.pixelSize);
@@ -62,28 +71,62 @@ export default function Home() {
     }
   }, [paletteMode, selectedPaletteId, extractedPalette, customPalette]);
 
+  const applySmartLook = useCallback((look: SmartLook) => {
+    setPixelSize(look.pixelSize);
+    setOutputWidth(look.outputWidth);
+    setOutputHeight(look.outputHeight);
+    setPaletteMode(look.paletteMode);
+    if (look.selectedPaletteId) {
+      setSelectedPaletteId(look.selectedPaletteId);
+    }
+    setExtractedColorCount(look.extractedColorCount);
+    setSamplingMode(look.samplingMode);
+    setPreFilters(look.preFilters);
+    setPostFilters(look.postFilters);
+    setSelectedLookId(look.id);
+  }, []);
+
   // Extract palette from image
   useEffect(() => {
     if (!originalImage || paletteMode !== 'extracted') return;
 
-    const canvas = document.createElement('canvas');
-    canvas.width = originalImage.naturalWidth;
-    canvas.height = originalImage.naturalHeight;
-    const ctx = canvas.getContext('2d')!;
-    ctx.drawImage(originalImage, 0, 0);
+    let cancelled = false;
+    setExtractedPalette([]);
+    const timer = window.setTimeout(() => {
+      const canvas = document.createElement('canvas');
+      const maxPaletteSide = 224;
+      const scale = Math.min(1, maxPaletteSide / Math.max(originalImage.naturalWidth, originalImage.naturalHeight));
+      canvas.width = Math.max(1, Math.round(originalImage.naturalWidth * scale));
+      canvas.height = Math.max(1, Math.round(originalImage.naturalHeight * scale));
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+      ctx.drawImage(originalImage, 0, 0, canvas.width, canvas.height);
 
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const palette = extractPalette(imageData, extractedColorCount);
-    setExtractedPalette(palette);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const palette = extractPalette(imageData, extractedColorCount);
+      if (!cancelled) {
+        setExtractedPalette(palette);
+      }
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [originalImage, paletteMode, extractedColorCount]);
 
   // Process image
   const processImage = useCallback(async () => {
     if (!originalImage) return;
+    if (paletteMode === 'extracted' && extractedPalette.length === 0) return;
 
+    const requestId = ++processRequestRef.current;
     setIsProcessing(true);
 
     try {
+      await new Promise<void>((resolve) => {
+        window.requestAnimationFrame(() => resolve());
+      });
+      const startedAt = performance.now();
       const config: PixelArtConfig = {
         pixelSize,
         outputWidth,
@@ -108,29 +151,95 @@ export default function Home() {
 
       const palette = getCurrentPalette();
       const result = await generatePixelArt(originalImage, config, palette);
-      setPixelatedCanvas(result);
+      if (requestId === processRequestRef.current) {
+        setPixelatedCanvas(result);
+        setProcessingTime(Math.round(performance.now() - startedAt));
+      }
     } catch (error) {
       console.error('Error processing image:', error);
     } finally {
-      setIsProcessing(false);
+      if (requestId === processRequestRef.current) {
+        setIsProcessing(false);
+      }
     }
   }, [
     originalImage, pixelSize, outputWidth, outputHeight, aspectRatio, aspectMode,
     customAspectWidth, customAspectHeight, paletteMode, selectedPaletteId,
-    customPalette, extractedColorCount, samplingMode, preFilters, postFilters, showGrid, getCurrentPalette
+    customPalette, extractedColorCount, extractedPalette.length, samplingMode, preFilters, postFilters, showGrid, getCurrentPalette
   ]);
 
   // Auto-process on changes
   useEffect(() => {
     const timer = setTimeout(() => {
       processImage();
-    }, 500); // Increased debounce for less lag
+    }, 180);
     return () => clearTimeout(timer);
   }, [processImage]);
 
+  useEffect(() => {
+    if (!smartAnalysis || !selectedLookId) return;
+
+    const look = smartAnalysis.looks.find(item => item.id === selectedLookId);
+    if (!look) return;
+
+    const stillMatches =
+      look.pixelSize === pixelSize &&
+      look.outputWidth === outputWidth &&
+      look.outputHeight === outputHeight &&
+      look.paletteMode === paletteMode &&
+      (!look.selectedPaletteId || look.selectedPaletteId === selectedPaletteId) &&
+      look.extractedColorCount === extractedColorCount &&
+      look.samplingMode === samplingMode &&
+      JSON.stringify(look.preFilters) === JSON.stringify(preFilters) &&
+      JSON.stringify(look.postFilters) === JSON.stringify(postFilters);
+
+    if (!stillMatches) {
+      setSelectedLookId(null);
+    }
+  }, [
+    smartAnalysis, selectedLookId, pixelSize, outputWidth, outputHeight,
+    paletteMode, selectedPaletteId, extractedColorCount, samplingMode, preFilters, postFilters
+  ]);
+
   // Handle image load
-  const handleImageLoad = useCallback((img: HTMLImageElement) => {
+  const handleImageLoad = useCallback((img: HTMLImageElement, label?: string) => {
+    const requestId = ++analysisRequestRef.current;
     setOriginalImage(img);
+    setPixelatedCanvas(null);
+    setProcessingTime(null);
+    setSourceLabel(label || 'IMAGE');
+    setSmartAnalysis(null);
+    setSelectedLookId(null);
+    setShowOriginal(false);
+    setIsAnalyzing(true);
+
+    analyzeImageForPixelArt(img)
+      .then((analysis) => {
+        if (requestId !== analysisRequestRef.current) return;
+        setSmartAnalysis(analysis);
+        const recommendedLook = analysis.looks.find(look => look.id === analysis.recommendedLookId) || analysis.looks[0];
+        applySmartLook(recommendedLook);
+      })
+      .catch((error) => {
+        console.error('Smart analysis failed:', error);
+      })
+      .finally(() => {
+        if (requestId === analysisRequestRef.current) {
+          setIsAnalyzing(false);
+        }
+      });
+  }, [applySmartLook]);
+
+  const resetImage = useCallback(() => {
+    analysisRequestRef.current++;
+    processRequestRef.current++;
+    setOriginalImage(null);
+    setPixelatedCanvas(null);
+    setProcessingTime(null);
+    setSourceLabel(null);
+    setSmartAnalysis(null);
+    setSelectedLookId(null);
+    setIsAnalyzing(false);
   }, []);
 
   // Export handlers
@@ -168,7 +277,7 @@ export default function Home() {
                   <div className="flex flex-wrap items-center gap-3 justify-between">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setOriginalImage(null)}
+                        onClick={resetImage}
                         className="btn-secondary text-sm"
                       >
                         NEW
@@ -186,6 +295,11 @@ export default function Home() {
                         GRID
                       </button>
                     </div>
+                    {processingTime !== null && (
+                      <span className="text-sm text-[var(--text-dim)]">
+                        {processingTime}MS
+                      </span>
+                    )}
                     <div className="flex items-center gap-2 relative">
                       <button
                         onClick={handleExportPNG}
@@ -200,7 +314,7 @@ export default function Home() {
                           disabled={!pixelatedCanvas || isProcessing}
                           className="btn-secondary text-sm"
                         >
-                          MORE ▾
+                          MORE
                         </button>
                         {showExportMenu && (
                           <div className="absolute top-full right-0 mt-1 z-50 glass-card p-2 min-w-[140px] flex flex-col gap-1">
@@ -246,6 +360,14 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
+
+                  <SmartAssistPanel
+                    analysis={smartAnalysis}
+                    sourceLabel={sourceLabel}
+                    selectedLookId={selectedLookId}
+                    isAnalyzing={isAnalyzing}
+                    onApplyLook={applySmartLook}
+                  />
 
                   {/* Preview */}
                   <PixelPreview
